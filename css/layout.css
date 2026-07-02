@@ -1,0 +1,132 @@
+/**
+ * layout.css
+ * アプリ全体のレイアウト
+ * （サイドバー / ナビゲーション / アコーディオン / ヘッダー / メイン領域）
+ */
+
+/* --- Layout --- */
+.app-container { display: flex; width: 100%; height: 100%; }
+
+/* Sidebar */
+.sidebar {
+    width: var(--sidebar-width); background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; z-index: 20;
+}
+.sidebar-header {
+    height: var(--header-height); display: flex; align-items: center; padding: 0 20px;
+    border-bottom: 1px solid var(--border); font-weight: 700; color: var(--primary); font-size: 1.1rem; gap: 10px;
+}
+.sidebar-content { flex: 1; overflow-y: auto; padding: 16px; }
+
+.nav-group { margin-bottom: 24px; }
+.nav-label { 
+    font-size: 0.75rem; color: var(--text-sub); font-weight: 700; text-transform: uppercase; 
+    letter-spacing: 0.5px; margin-bottom: 8px; padding: 8px 12px; 
+    cursor: pointer; border-radius: var(--radius-md); transition: background 0.2s;
+    display: flex; align-items: center; justify-content: space-between;
+    user-select: none;
+}
+.nav-label:hover { background: #f1f5f9; }
+.nav-label.active { background: var(--filter-active-bg); color: var(--filter-active-text); }
+.nav-label i.chevron { 
+    transition: transform 0.2s; font-size: 0.7rem; color: var(--text-sub); 
+}
+.nav-label.active i.chevron { color: var(--filter-active-text); }
+.nav-group.collapsed .nav-label i.chevron { transform: rotate(-90deg); }
+.nav-group.collapsed .nav-content { display: none; }
+
+/* Nav Item (for Dashboard and All Assets) */
+.nav-item {
+    padding: 10px 12px; cursor: pointer; font-size: 0.9rem; color: var(--text-sub);
+    display: flex; align-items: center; gap: 10px; border-radius: var(--radius-md); margin-bottom: 4px;
+    transition: all 0.2s; font-weight: 500; user-select: none;
+}
+.nav-item:hover { background: #f1f5f9; color: var(--primary); }
+.nav-item.active { background: var(--filter-active-bg); color: white; box-shadow: var(--shadow-sm); }
+.nav-item i { width: 20px; text-align: center; }
+
+/* Accordion in Sidebar */
+.accordion-item { border-radius: var(--radius-md); overflow: hidden; margin-bottom: 4px; }
+.accordion-header {
+    padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; font-size: 0.9rem; font-weight: 500; color: var(--text-main);
+    transition: all 0.2s; border-radius: var(--radius-md); position: relative;
+}
+.accordion-header:hover { background: #f1f5f9; }
+.accordion-header i.chevron { 
+    transition: all 0.2s; font-size: 0.8rem; color: var(--text-sub); 
+}
+
+/* 展開状態のアコーディオンのスタイル */
+.accordion-item.open {
+    background: #eff6ff; /* 淡いブルーの背景 */
+    border: 1px solid #bfdbfe; /* 淡いブルーのボーダー */
+    border-radius: var(--radius-md);
+    margin-bottom: 6px;
+}
+.accordion-item.open > .accordion-header {
+    background: transparent;
+    color: var(--primary);
+    font-weight: 600;
+}
+.accordion-item.open > .accordion-header:hover {
+    background: rgba(37, 99, 235, 0.05);
+}
+.accordion-item.open > .accordion-header i.chevron {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+/* 親ノードのフィルタボタン */
+.accordion-header-content {
+    display: flex; align-items: center; flex: 1; gap: 8px;
+}
+.accordion-filter-icon {
+    opacity: 0; transition: opacity 0.2s; color: var(--primary); font-size: 0.75rem;
+    margin-left: auto; margin-right: 4px;
+}
+.accordion-header:hover .accordion-filter-icon { opacity: 0.6; }
+.accordion-header.filtered .accordion-filter-icon { opacity: 1; }
+
+.accordion-body { 
+    display: none; 
+    padding-left: 4px; 
+    margin-top: 2px; 
+    position: relative; 
+}
+.accordion-body::before { /* Guide Line */
+    content: ''; position: absolute; left: 18px; top: 0; bottom: 0; width: 1px; background: #cbd5e1;
+}
+.accordion-item.open .accordion-body::before {
+    background: #93c5fd; /* 展開時はより目立つブルー */
+}
+.accordion-item.open .accordion-header i.chevron { transform: rotate(180deg); }
+.accordion-item.open .accordion-body { display: block; }
+
+.tree-link {
+    padding: 8px 12px 8px 24px; cursor: pointer; font-size: 0.85rem; color: var(--text-sub);
+    display: flex; align-items: center; gap: 8px; border-radius: var(--radius-md); margin-top: 2px;
+    position: relative; transition: all 0.2s;
+}
+.tree-link:hover { background: #f8fafc; color: var(--primary); }
+
+/* Improved Active State for Filter visibility - 落ち着いたトーンに変更 */
+.tree-link.active, .accordion-header.active { 
+    background: var(--filter-active-bg); 
+    color: var(--filter-active-text); 
+    font-weight: 600; 
+    box-shadow: 0 2px 4px rgba(79, 122, 196, 0.3);
+}
+.accordion-header.active:hover {
+    background: #45699e; /* ホバー時も落ち着いたトーン */
+}
+.tree-link.active::before { display: none; } /* Remove old side bar marker */
+
+/* Main Content */
+.main { flex: 1; display: flex; flex-direction: column; background: var(--background); overflow: hidden; }
+.header {
+    height: var(--header-height); background: var(--surface); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; padding: 0 32px;
+    box-shadow: var(--shadow-sm); z-index: 10;
+}
+.content-scroll { flex: 1; overflow-y: auto; padding: 32px; }
