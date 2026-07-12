@@ -43,12 +43,16 @@ const availableColumns = [
  * アプリケーション初期化 (非同期)
  */
 document.addEventListener('DOMContentLoaded', async () => {
+    // バージョン表示（config.js の APP_VERSION を単一の情報源として反映）
+    const versionBadge = document.getElementById('appVersionBadge');
+    if(versionBadge) versionBadge.textContent = `v${APP_VERSION}`;
+
     // DBからデータを読み込み (非同期待機)
     await loadDataFromDB();
-    
+
     // カスタムフィールド列を動的に追加
     addCustomFieldColumns();
-    
+
     // UIの描画
     renderSidebar();
     showDashboard(); // デフォルトでダッシュボードを表示

@@ -4,6 +4,10 @@
  * 初期データとグローバル設定、データ永続化機能 (IndexedDB対応版)
  */
 
+// アプリケーションバージョン（セマンティックバージョニング）
+// サイドバーのアプリ名横に表示される。更新時はここを変更するだけでよい。
+const APP_VERSION = '1.1.0';
+
 // Dexie.js データベース定義
 const DB_NAME = 'AssetManagerDB';
 const db = new Dexie(DB_NAME);
