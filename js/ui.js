@@ -1,24 +1,40 @@
 
 /**
  * ui.js
- * 基本UI操作
+ * 基本UI操作（モーダル / メニュー / アコーディオン / サイドバー / ショートカット一覧）
  */
 
 /**
+ * モーダルを開く
+ * @param {string} id
+ */
+function openModal(id) {
+    const el = document.getElementById(id);
+    if(el) el.classList.add('open');
+}
+
+/**
  * モーダルを閉じる
+ * 資産モーダルに未保存の変更がある場合は、閉じる前に必ず確認する。
+ * （作業内容が黙って消えることがない＝安心して触れる）
  */
 function closeModal(id) {
-    document.getElementById(id).classList.remove('open');
+    if(id === 'assetModal' && typeof hasUnsavedAssetChanges === 'function' && hasUnsavedAssetChanges()) {
+        const label = isNewAsset ? 'この資産はまだ保存されていません。' : '未保存の変更があります。';
+        if(!confirm(`${label}\n変更を破棄して閉じますか？\n\n（「キャンセル」を選ぶと編集に戻ります）`)) return;
+    }
+
+    const el = document.getElementById(id);
+    if(el) el.classList.remove('open');
+
     if(id === 'assetModal') {
         // 新規作成中にモーダルを閉じた場合は一時資産を削除
         if(isNewAsset && editingAssetId) {
             assets = assets.filter(a => a.id !== editingAssetId);
-            if(window.currentAssetList) {
-                window.currentAssetList = window.currentAssetList.filter(a => a.id !== editingAssetId);
-            }
         }
-        isNewAsset = false;    // 新規作成フラグをリセット
-        editingAssetId = null; // 編集中IDをリセット
+        isNewAsset = false;
+        editingAssetId = null;
+        if(typeof refreshCurrentView === 'function') refreshCurrentView();
     }
 }
 
@@ -34,33 +50,36 @@ function toggleSidebar(force) {
     }
 }
 
+/* ============================================================
+   ドロップダウンメニュー
+   使用頻度の低い操作は、アイコンだけのボタンではなく
+   ラベル付きのメニューに集約する（意味を推測させない）
+   ============================================================ */
+
+function toggleMenu(id, event) {
+    if(event) event.stopPropagation();
+    const menu = document.getElementById(id);
+    if(!menu) return;
+    const wasOpen = menu.classList.contains('open');
+    closeMenus();
+    if(!wasOpen) menu.classList.add('open');
+}
+
+function closeMenus() {
+    document.querySelectorAll('.menu.open').forEach(m => m.classList.remove('open'));
+}
+
 /**
  * アコーディオンの開閉
  */
-function toggleAccordion(el) { 
+function toggleAccordion(el) {
     const item = el.parentElement;
-    const body = item.querySelector('.accordion-body');
-    const chevron = el.querySelector('.chevron');
-    
-    // openクラスのトグル
+    const body = item.querySelector(':scope > .accordion-body');
+
     item.classList.toggle('open');
-    
-    // accordion-bodyの表示切り替え
+
     if(body) {
-        if(item.classList.contains('open')) {
-            body.style.display = 'block';
-        } else {
-            body.style.display = 'none';
-        }
-    }
-    
-    // chevronの回転
-    if(chevron) {
-        if(item.classList.contains('open')) {
-            chevron.style.transform = 'rotate(180deg)';
-        } else {
-            chevron.style.transform = 'rotate(0deg)';
-        }
+        body.style.display = item.classList.contains('open') ? 'block' : 'none';
     }
 }
 
@@ -68,21 +87,84 @@ function toggleAccordion(el) {
  * グラフビューの操作ガイドを折りたたみ／展開
  */
 function toggleGraphLegend(type) {
-    const contentId = type === 'tags' ? 'tagsLegendContent' : 'assetsLegendContent';
-    const chevronId = type === 'tags' ? 'tagsLegendChevron' : 'assetsLegendChevron';
-    
-    const content = document.getElementById(contentId);
-    const chevron = document.getElementById(chevronId);
-    
+    const content = document.getElementById(type === 'tags' ? 'tagsLegendContent' : 'assetsLegendContent');
+    const chevron = document.getElementById(type === 'tags' ? 'tagsLegendChevron' : 'assetsLegendChevron');
     if(!content || !chevron) return;
-    
-    if(content.style.display === 'none') {
-        content.style.display = 'block';
-        chevron.style.transform = 'rotate(90deg)';
-    } else {
-        content.style.display = 'none';
-        chevron.style.transform = 'rotate(0deg)';
-    }
+
+    const willOpen = content.style.display === 'none';
+    content.style.display = willOpen ? 'block' : 'none';
+    chevron.style.transform = willOpen ? 'rotate(90deg)' : 'rotate(0deg)';
 }
 
+/* ============================================================
+   ショートカット一覧（? キー）
+   「思い出させない」ため、いつでも一覧を確認できるようにする
+   ============================================================ */
 
+const KEY_SHORTCUTS = [
+    {
+        group: '移動・検索',
+        items: [
+            { keys: ['Ctrl', 'K'], desc: '資産・タグ・操作を横断検索' },
+            { keys: ['/'],         desc: '表示中の一覧を絞り込む' },
+            { keys: ['G', 'D'],    desc: 'ダッシュボードへ移動' },
+            { keys: ['G', 'A'],    desc: '資産一覧へ移動' }
+        ]
+    },
+    {
+        group: '登録・編集',
+        items: [
+            { keys: ['N'],          desc: '新規資産を登録' },
+            { keys: ['Ctrl', 'V'],  desc: '画像を貼り付けて登録' },
+            { keys: ['Ctrl', 'S'],  desc: '編集中の資産を保存' },
+            { keys: ['Esc'],        desc: '閉じる / 取り消す' }
+        ]
+    },
+    {
+        group: '一覧・グラフ',
+        items: [
+            { keys: ['1'],   desc: 'リスト表示' },
+            { keys: ['2'],   desc: 'カード表示' },
+            { keys: ['3'],   desc: 'カレンダー表示' },
+            { keys: ['Del'], desc: 'グラフで選択中のノード・接続を削除' }
+        ]
+    }
+];
+
+function openKeyHelp() {
+    const container = document.getElementById('keyHelpContent');
+    if(container) {
+        container.innerHTML = KEY_SHORTCUTS.map(g => `
+            <div>
+                <div class="keyhelp-group-title">${escapeHTML(g.group)}</div>
+                ${g.items.map(item => `
+                    <div class="keyhelp-row">
+                        <span>${escapeHTML(item.desc)}</span>
+                        <span class="keyhelp-keys">${item.keys.map(k => `<span class="kbd">${escapeHTML(k)}</span>`).join('')}</span>
+                    </div>`).join('')}
+            </div>`).join('');
+    }
+    openModal('keyHelpModal');
+}
+
+/* ============================================================
+   トグルボタン（セグメンテッド・コントロール）の状態
+   ============================================================ */
+
+/**
+ * トグルボタンをアクティブに設定する
+ */
+function setToggleActive(btn) {
+    if(!btn) return;
+    btn.className = 'btn btn-sm toggle-btn-active';
+    btn.setAttribute('aria-pressed', 'true');
+}
+
+/**
+ * トグルボタンを非アクティブに設定する
+ */
+function setToggleInactive(btn) {
+    if(!btn) return;
+    btn.className = 'btn btn-sm toggle-btn-inactive';
+    btn.setAttribute('aria-pressed', 'false');
+}

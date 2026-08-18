@@ -1161,8 +1161,13 @@ function switchMasterTab(mode) {
 }
 
 function saveMasterChanges() {
-    renderSidebar(); autoSaveData();
-    showToast('設定を保存しました');
+    // タグ階層やカスタムフィールドの変更は、一覧の列定義・サイドバー・
+    // 表示中の一覧すべてに波及するため、まとめて作り直す
+    addCustomFieldColumns();
+    renderSidebar();
+    refreshCurrentView();
+    autoSaveData();
+    showToast('マスタ設定を保存しました', 'success');
     closeModal('masterModal');
 }
 

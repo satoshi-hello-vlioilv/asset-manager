@@ -10,7 +10,7 @@ function exportToJSON() {
         exportDate: new Date().toISOString(),
         masters: masters,
         tags: tags,
-        assets: assets,
+        assets: getPersistedAssets(), // 編集中の下書きは書き出さない
         listDisplaySettings: listDisplaySettings // リスト表示設定を追加
     };
     
@@ -132,11 +132,13 @@ function processJSONFile(file) {
                 listDisplaySettings = data.listDisplaySettings;
             }
             
-            // UIを更新
+            // UIを更新（列定義とタグ階層が入れ替わるため、絞り込みは解除する）
+            addCustomFieldColumns();
+            activeFilter = null;
+            searchQuery = '';
             renderSidebar();
-            renderAssets(assets);
-            switchAssetView(assetViewMode); // 現在のビューモードを維持
-            
+            refreshCurrentView();
+
             showToast(`✓ ${data.assets.length}件の資産をインポートしました`, 'success');
             autoSaveData(); // インポート後に自動保存
         } catch(error) {
@@ -177,11 +179,15 @@ function setupGlobalDropZone() {
             transition: opacity 0.2s;
         `;
         
+        // ドロップできるものを明示する（何が起きるか推測させない）
         dropOverlay.innerHTML = `
-            <div style="background: white; padding: 60px 80px; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); border: 3px dashed var(--primary); text-align: center;">
-                <i class="fa-solid fa-file-import" style="font-size: 4rem; color: var(--primary); margin-bottom: 20px; display: block;"></i>
-                <div style="font-size: 1.5rem; font-weight: 700; color: var(--text); margin-bottom: 8px;">JSONファイルをドロップ</div>
-                <div style="font-size: 1rem; color: var(--text-sub);">データをインポートします</div>
+            <div style="background:var(--surface); padding:48px 64px; border-radius:var(--radius-xl); box-shadow:var(--shadow-xl); border:3px dashed var(--primary); text-align:center;">
+                <i class="fa-solid fa-hand-pointer" style="font-size:3rem; color:var(--primary); margin-bottom:16px; display:block;"></i>
+                <div style="font-size:1.3rem; font-weight:700; color:var(--text-strong); margin-bottom:12px;">ここにドロップ</div>
+                <div style="font-size:0.9rem; color:var(--text-sub); line-height:1.8;">
+                    <div><i class="fa-solid fa-file-code" style="width:20px;"></i> JSONファイル → データを読み込む</div>
+                    <div><i class="fa-solid fa-image" style="width:20px;"></i> 画像ファイル → その画像で新規資産を作成</div>
+                </div>
             </div>
         `;
         
@@ -254,267 +260,27 @@ function setupGlobalDropZone() {
         dragCounter = 0;
         removeDropOverlay();
         
-        const files = e.dataTransfer.files;
+        const files = Array.from(e.dataTransfer.files);
         if(files.length === 0) return;
-        
-        // JSONファイルを探す
-        const jsonFile = Array.from(files).find(file => 
-            file.name.endsWith('.json') || file.type === 'application/json'
-        );
-        
+
+        // JSONファイル（データの読み込み）
+        const jsonFile = files.find(file => file.name.endsWith('.json') || file.type === 'application/json');
         if(jsonFile) {
-            // 確認ダイアログ
             if(confirm(`📄 ${jsonFile.name}\n\nこのファイルをインポートしますか？`)) {
                 processJSONFile(jsonFile);
             } else {
                 showToast('インポートをキャンセルしました', 'info');
             }
-        } else {
-            showToast('❌ JSONファイルが見つかりませんでした', 'warning');
+            return;
         }
+
+        // 画像ファイル（貼り付けと同じく、新規資産の下書きを作る）
+        const imageFiles = files.filter(file => file.type.startsWith('image/'));
+        if(imageFiles.length > 0) {
+            receivePastedImages(imageFiles);
+            return;
+        }
+
+        showToast('JSONまたは画像ファイルをドロップしてください', 'warning');
     });
 }
-
-function renderImagesGallery() {
-    const asset = assets.find(a => a.id === editingAssetId);
-    if(!asset) return;
-    
-    if(!asset.images) asset.images = [];
-    
-    const container = document.getElementById('imagesGalleryContainer');
-    
-    if(asset.images.length === 0) {
-        container.innerHTML = `
-            <div style="padding:60px 20px; text-align:center; color:var(--text-sub);">
-                <i class="fa-regular fa-images" style="font-size:3rem; margin-bottom:12px; display:block; opacity:0.3;"></i>
-                <div style="font-size:0.95rem;">画像はまだ登録されていません</div>
-                <div style="font-size:0.85rem; margin-top:4px; opacity:0.7;">上のフォームからURLを追加してください</div>
-            </div>
-        `;
-        return;
-    }
-    
-    let html = '<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">';
-    
-    asset.images.forEach((img, index) => {
-        const isSelected = img.selected || false;
-        const borderStyle = isSelected ? 'border:3px solid var(--primary); box-shadow:0 0 0 3px rgba(37, 99, 235, 0.2);' : 'border:1px solid var(--border);';
-        
-        html += `
-            <div style="position:relative; ${borderStyle} border-radius:var(--radius-md); overflow:hidden; transition:all 0.2s; cursor:pointer;" 
-                 onclick="selectImageAsThumbnail(${index})"
-                 title="${isSelected ? '選択中（サムネイル）' : 'クリックしてサムネイルに設定'}">
-                ${isSelected ? '<div style="position:absolute; top:8px; right:8px; background:var(--primary); color:white; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; z-index:2;"><i class="fa-solid fa-check"></i> 選択中</div>' : ''}
-                <div style="aspect-ratio:16/9; background:#f1f5f9; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-                    <img src="${img.url}" alt="Asset Image" style="width:100%; height:100%; object-fit:cover;" 
-                         onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\\'fa-solid fa-image-slash\\' style=\\'font-size:2rem; color:#cbd5e1;\\'></i>';">
-                </div>
-                ${img.comment ? `<div style="padding:8px; font-size:0.85rem; color:var(--text-sub); background:#fafafa;">${img.comment}</div>` : ''}
-                <div style="padding:8px; display:flex; gap:4px; justify-content:flex-end; background:#fff;">
-                    <button class="btn btn-ghost btn-sm btn-icon-only" onclick="event.stopPropagation(); editImageComment(${index})" title="コメント編集">
-                        <i class="fa-solid fa-edit"></i>
-                    </button>
-                    <button class="btn btn-danger-ghost btn-sm btn-icon-only" onclick="event.stopPropagation(); deleteImage(${index})" title="削除">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-    });
-    
-    html += '</div>';
-    container.innerHTML = html;
-}
-
-function setupImageDropZone() {
-    const dropZone = document.getElementById('imageDropZone');
-    const fileInput = document.getElementById('imageFileInput');
-    
-    if(!dropZone) return;
-    
-    // クリックでファイル選択
-    dropZone.onclick = () => fileInput.click();
-    
-    // ドラッグオーバー
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.style.borderColor = 'var(--primary)';
-        dropZone.style.background = '#eff6ff';
-    });
-    
-    dropZone.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.style.borderColor = 'var(--border)';
-        dropZone.style.background = '#fff';
-    });
-    
-    // ドロップ
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.style.borderColor = 'var(--border)';
-        dropZone.style.background = '#fff';
-        
-        const files = e.dataTransfer.files;
-        handleImageFiles(files);
-    });
-}
-
-function handleImageFiles(files) {
-    if(!files || files.length === 0) return;
-    
-    const asset = assets.find(a => a.id === editingAssetId);
-    if(!asset) return;
-    
-    if(!asset.images) asset.images = [];
-    
-    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
-    
-    if(imageFiles.length === 0) {
-        showToast('画像ファイルが見つかりませんでした', 'warning');
-        return;
-    }
-    
-    let processedCount = 0;
-    const totalCount = imageFiles.length;
-    
-    imageFiles.forEach((file, index) => {
-        const reader = new FileReader();
-        
-        reader.onload = (e) => {
-            const base64 = e.target.result;
-            
-            // 初回画像は自動的に選択状態にする
-            const selected = asset.images.length === 0 && index === 0;
-            
-            asset.images.push({
-                url: base64,
-                comment: file.name || '',
-                selected: selected
-            });
-            
-            processedCount++;
-            
-            if(processedCount === totalCount) {
-                renderImagesGallery();
-                showToast(`${totalCount}個の画像を追加しました`, 'success');
-                // 親画面（リスト/カード）も更新してサムネイルを反映
-                renderAssets(window.currentAssetList || assets);
-                // 追加: ダッシュボード表示中なら更新
-                if (typeof currentPage !== 'undefined' && currentPage === 'dashboard') {
-                    renderDashboard();
-                }
-                autoSaveData(); // 自動保存
-            }
-        };
-        
-        reader.onerror = () => {
-            processedCount++;
-            showToast(`${file.name}の読み込みに失敗しました`, 'error');
-        };
-        
-        reader.readAsDataURL(file);
-    });
-}
-
-function addImageFromUrl() {
-    const url = document.getElementById('newImageUrl').value.trim();
-    const comment = document.getElementById('newImageComment').value.trim();
-    
-    if(!url) {
-        showToast('画像URLを入力してください', 'warning');
-        return;
-    }
-    
-    const asset = assets.find(a => a.id === editingAssetId);
-    if(!asset) return;
-    
-    if(!asset.images) asset.images = [];
-    
-    // 初回画像は自動的に選択状態にする
-    const selected = asset.images.length === 0;
-    
-    asset.images.push({
-        url: url,
-        comment: comment,
-        selected: selected
-    });
-    
-    document.getElementById('newImageUrl').value = '';
-    document.getElementById('newImageComment').value = '';
-    
-    renderImagesGallery();
-    // 親画面（リスト/カード）も更新してサムネイルを反映
-    renderAssets(window.currentAssetList || assets);
-    // 追加: ダッシュボード表示中なら更新
-    if (typeof currentPage !== 'undefined' && currentPage === 'dashboard') {
-        renderDashboard();
-    }
-    showToast('画像を追加しました', 'success');
-    autoSaveData(); // 自動保存
-}
-
-function selectImageAsThumbnail(index) {
-    const asset = assets.find(a => a.id === editingAssetId);
-    if(!asset || !asset.images) return;
-    
-    // 全ての画像の選択を解除
-    asset.images.forEach(img => img.selected = false);
-    
-    // 指定された画像を選択
-    asset.images[index].selected = true;
-    
-    renderImagesGallery();
-    // 親画面（リスト/カード）も更新してサムネイルを反映
-    renderAssets(window.currentAssetList || assets);
-    // 追加: ダッシュボード表示中なら更新
-    if (typeof currentPage !== 'undefined' && currentPage === 'dashboard') {
-        renderDashboard();
-    }
-    showToast('サムネイル画像を設定しました', 'success');
-    autoSaveData(); // 自動保存
-}
-
-function editImageComment(index) {
-    // (変更なしですが、contextのために記載)
-    const asset = assets.find(a => a.id === editingAssetId);
-    if(!asset || !asset.images || !asset.images[index]) return;
-    
-    const currentComment = asset.images[index].comment || '';
-    const newComment = prompt('画像のコメントを入力:', currentComment);
-    
-    if(newComment !== null) {
-        asset.images[index].comment = newComment.trim();
-        renderImagesGallery();
-        showToast('コメントを更新しました', 'success');
-        autoSaveData(); // 自動保存
-    }
-}
-
-function deleteImage(index) {
-    const asset = assets.find(a => a.id === editingAssetId);
-    if(!asset || !asset.images) return;
-    
-    if(!confirm('この画像を削除しますか？')) return;
-    
-    const wasSelected = asset.images[index].selected;
-    asset.images.splice(index, 1);
-    
-    // 削除した画像が選択されていた場合、最初の画像を選択
-    if(wasSelected && asset.images.length > 0) {
-        asset.images[0].selected = true;
-    }
-    
-    renderImagesGallery();
-    // 親画面（リスト/カード）も更新してサムネイルを反映
-    renderAssets(window.currentAssetList || assets);
-    // 追加: ダッシュボード表示中なら更新
-    if (typeof currentPage !== 'undefined' && currentPage === 'dashboard') {
-        renderDashboard();
-    }
-    showToast('画像を削除しました', 'success');
-    autoSaveData(); // 自動保存
-}
-

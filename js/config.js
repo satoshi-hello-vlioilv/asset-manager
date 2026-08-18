@@ -6,7 +6,7 @@
 
 // アプリケーションバージョン（セマンティックバージョニング）
 // サイドバーのアプリ名横に表示される。更新時はここを変更するだけでよい。
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '2.0.0';
 
 // Dexie.js データベース定義
 const DB_NAME = 'AssetManagerDB';
@@ -321,27 +321,7 @@ function resetListSortState() {
     listSortState.direction = null;
 }
 
-/**
- * トグルボタンをアクティブに設定する
- * @param {HTMLElement} btn
- */
-function setToggleActive(btn) {
-    btn.className = 'btn btn-sm toggle-btn-active';
-    btn.style.background = '';
-    btn.style.boxShadow = '';
-    btn.style.color = '';
-}
-
-/**
- * トグルボタンを非アクティブに設定する
- * @param {HTMLElement} btn
- */
-function setToggleInactive(btn) {
-    btn.className = 'btn btn-sm toggle-btn-inactive';
-    btn.style.background = '';
-    btn.style.boxShadow = '';
-    btn.style.color = '';
-}
+/* setToggleActive / setToggleInactive は js/ui.js に統合 */
 
 /**
  * データをIndexedDBに保存
@@ -352,8 +332,9 @@ async function saveDataToDB() {
         // メモリ上のデータをDBテーブルに一括保存
         await db.transaction('rw', db.assets, db.tags, db.masters, db.system, async () => {
             // 安全のためテーブルをクリアしてから現在のメモリ状態を保存
+            // 編集中の下書き（一時ID）は確定データではないので永続化しない
             await db.assets.clear();
-            await db.assets.bulkPut(assets);
+            await db.assets.bulkPut(getPersistedAssets());
 
             await db.tags.clear();
             await db.tags.bulkPut(tags);

@@ -9,25 +9,14 @@ function renderHistoryRecords() {
     if(!asset || !asset.maintenance) return;
     
     const container = document.getElementById('historyRecordsContainer');
-    
+
+    if(typeof updateAssetTabCounts === 'function') updateAssetTabCounts();
+
     // ソートボタンの状態を更新
     const sortDescBtn = document.getElementById('sortDescBtn');
     const sortAscBtn = document.getElementById('sortAscBtn');
-    if(historySortOrder === 'desc') {
-        sortDescBtn.className = 'btn btn-outline btn-sm';
-        sortDescBtn.style.background = '#fff';
-        sortDescBtn.style.boxShadow = 'var(--shadow-sm)';
-        sortAscBtn.className = 'btn btn-ghost btn-sm';
-        sortAscBtn.style.background = 'transparent';
-        sortAscBtn.style.boxShadow = 'none';
-    } else {
-        sortAscBtn.className = 'btn btn-outline btn-sm';
-        sortAscBtn.style.background = '#fff';
-        sortAscBtn.style.boxShadow = 'var(--shadow-sm)';
-        sortDescBtn.className = 'btn btn-ghost btn-sm';
-        sortDescBtn.style.background = 'transparent';
-        sortDescBtn.style.boxShadow = 'none';
-    }
+    setToggleActive(historySortOrder === 'desc' ? sortDescBtn : sortAscBtn);
+    setToggleInactive(historySortOrder === 'desc' ? sortAscBtn : sortDescBtn);
     
     if(asset.maintenance.length === 0) {
         container.innerHTML = `
@@ -212,25 +201,14 @@ function renderScheduleRecords() {
     if(!asset.scheduledPlans) asset.scheduledPlans = [];
     
     const container = document.getElementById('scheduleRecordsContainer');
-    
+
+    if(typeof updateAssetTabCounts === 'function') updateAssetTabCounts();
+
     // ソートボタンの状態を更新
     const sortDescBtn = document.getElementById('sortScheduleDescBtn');
     const sortAscBtn = document.getElementById('sortScheduleAscBtn');
-    if(scheduleSortOrder === 'desc') {
-        sortDescBtn.className = 'btn btn-outline btn-sm';
-        sortDescBtn.style.background = '#fff';
-        sortDescBtn.style.boxShadow = 'var(--shadow-sm)';
-        sortAscBtn.className = 'btn btn-ghost btn-sm';
-        sortAscBtn.style.background = 'transparent';
-        sortAscBtn.style.boxShadow = 'none';
-    } else {
-        sortAscBtn.className = 'btn btn-outline btn-sm';
-        sortAscBtn.style.background = '#fff';
-        sortAscBtn.style.boxShadow = 'var(--shadow-sm)';
-        sortDescBtn.className = 'btn btn-ghost btn-sm';
-        sortDescBtn.style.background = 'transparent';
-        sortDescBtn.style.boxShadow = 'none';
-    }
+    setToggleActive(scheduleSortOrder === 'desc' ? sortDescBtn : sortAscBtn);
+    setToggleInactive(scheduleSortOrder === 'desc' ? sortAscBtn : sortDescBtn);
     
     if(asset.scheduledPlans.length === 0) {
         container.innerHTML = `
@@ -377,7 +355,7 @@ function addScheduleRecord() {
     
     // カレンダービューの場合は更新
     if(assetViewMode === 'calendar') {
-        renderAssets(window.currentAssetList || assets);
+        refreshCurrentView();
     }
     autoSaveData(); // 自動保存
 }
@@ -425,7 +403,7 @@ function saveScheduleRecord(index) {
     
     // カレンダービューの場合は更新
     if(assetViewMode === 'calendar') {
-        renderAssets(window.currentAssetList || assets);
+        refreshCurrentView();
     }
     autoSaveData(); // 自動保存
 }
@@ -457,7 +435,7 @@ function deleteScheduleRecord(index) {
     
     // カレンダービューの場合は更新
     if(assetViewMode === 'calendar') {
-        renderAssets(window.currentAssetList || assets);
+        refreshCurrentView();
     }
     autoSaveData(); // 自動保存
 }

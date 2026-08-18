@@ -388,7 +388,7 @@ function saveListSettings() {
     closeModal('listSettingsModal');
 
     if(assetViewMode === 'list') {
-        renderAssets(window.currentAssetList || assets);
+        refreshCurrentView();
     }
 
     showToast('リスト表示設定を保存しました', 'success');

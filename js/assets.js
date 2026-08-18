@@ -1,35 +1,35 @@
 
 /**
  * assets.js
- * 資産表示機能（リスト/カード/カレンダービュー）
+ * 資産表示機能（リスト / カード / カレンダービュー）
  */
 
-function switchAssetView(mode) {
+/**
+ * 表示形式を切り替える
+ * @param {'list'|'card'|'calendar'} mode
+ * @param {{skipRender?: boolean}} [options]
+ */
+function switchAssetView(mode, options = {}) {
     assetViewMode = mode;
     const btnList     = document.getElementById('btnViewList');
     const btnCard     = document.getElementById('btnViewCard');
     const btnCalendar = document.getElementById('btnViewCalendar');
     const btnListSettings = document.getElementById('btnListSettings');
 
-    // 全ボタンを非アクティブにリセットし、選択されたものをアクティブにする
-    [btnList, btnCard, btnCalendar].forEach(btn => setToggleInactive(btn));
+    [btnList, btnCard, btnCalendar].forEach(btn => { if(btn) setToggleInactive(btn); });
     const activeBtn = { list: btnList, card: btnCard, calendar: btnCalendar }[mode];
-    if (activeBtn) setToggleActive(activeBtn);
+    if(activeBtn) setToggleActive(activeBtn);
 
-    // 表示設定ボタンの表示/非表示
-    btnListSettings.style.display = mode === 'list' ? 'inline-flex' : 'none';
+    // 列設定はリスト表示のときだけ意味を持つ
+    if(btnListSettings) btnListSettings.style.display = (mode === 'list' && currentPage === 'assets') ? 'inline-flex' : 'none';
 
-    // 現在の表示データを再レンダリング
-    const currentData = window.currentAssetList || assets;
-    renderAssets(currentData);
+    if(!options.skipRender) applyFilters();
 }
 
 /**
  * 資産データをレンダリング（ビューモードに応じて切り替え）
  */
 function renderAssets(list) {
-    window.currentAssetList = list; // 現在のリストを保存
-    
     if(assetViewMode === 'list') {
         renderAssetsList(list);
     } else if(assetViewMode === 'card') {
@@ -39,80 +39,62 @@ function renderAssets(list) {
     }
 }
 
-/**
- * リストビューでレンダリング
- */
+/* ============================================================
+   リストビュー
+   ============================================================ */
+
 function renderAssetsList(list) {
     const container = document.getElementById('assetContainer');
     container.innerHTML = '';
-    
-    // 表示設定ボタンを表示
-    document.getElementById('btnListSettings').style.display = 'inline-flex';
-    
-    // 表示する列を順序でソートしてフィルタ
+
     const visibleColumns = listDisplaySettings.columns
         .filter(col => col.visible)
         .sort((a, b) => a.order - b.order);
-    
+
     if(visibleColumns.length === 0) {
         container.innerHTML = `
-            <div style="padding:60px 20px; text-align:center; color:var(--text-sub);">
-                <i class="fa-solid fa-eye-slash" style="font-size:3rem; margin-bottom:12px; display:block; opacity:0.3;"></i>
-                <div style="font-size:1rem;">表示する列が設定されていません</div>
-                <div style="font-size:0.85rem; margin-top:8px; opacity:0.7;">
-                    <button class="btn btn-primary btn-sm" onclick="openListSettingsModal()" style="margin-top:16px;">
-                        <i class="fa-solid fa-sliders"></i> 表示設定を開く
-                    </button>
-                </div>
-            </div>
-        `;
+            <div class="panel empty-state">
+                <i class="fa-solid fa-eye-slash empty-state-icon"></i>
+                <div class="empty-state-title">表示する列が1つも選ばれていません</div>
+                <div class="empty-state-desc">リストに出したい項目を選んでください</div>
+                <button class="btn btn-primary" onclick="openListSettingsModal()">
+                    <i class="fa-solid fa-table-columns"></i> 列を設定する
+                </button>
+            </div>`;
         return;
     }
 
-    // 対象資産が0件の場合は空状態を表示
     if(list.length === 0) {
         renderAssetsEmptyState(container);
         return;
     }
 
-    // 列幅を計算
     const columnWidths = calculateColumnWidths(visibleColumns, list);
-    
-    // リストコンテナ（スクロール可能エリア）
+
     const listWrapper = document.createElement('div');
-    listWrapper.style.cssText = 'position:relative; overflow:auto; max-height:calc(100vh - 250px); border:1px solid var(--border); border-radius:var(--radius-md); background:#fff;';
-    
-    // テーブル
+    listWrapper.className = 'list-table-wrap';
+    listWrapper.style.maxHeight = 'calc(100vh - 230px)';
+
     const table = document.createElement('table');
-    table.style.cssText = 'width:100%; border-collapse:collapse; table-layout:fixed;';
-    
-    // ヘッダー（固定）
+    table.className = 'list-table';
+
+    // ヘッダー（固定 + ソート）
     const thead = document.createElement('thead');
-    thead.style.cssText = 'position:sticky; top:0; z-index:10; background:#f8fafc; box-shadow:0 2px 4px rgba(0,0,0,0.05);';
-    
     const headerRow = document.createElement('tr');
     visibleColumns.forEach((col, index) => {
         const th = document.createElement('th');
-        const width = columnWidths[index];
-        const headerAlign = col.headerAlign || 'left';
         const isSorted = listSortState.key === col.key;
-        const sortedBg = isSorted ? 'rgba(37,99,235,0.05)' : '';
-        const sortedColor = isSorted ? 'var(--primary)' : 'var(--text-sub)';
-        const sortedBorder = isSorted ? 'var(--primary)' : 'var(--border)';
+        th.style.width = columnWidths[index];
+        th.style.textAlign = col.headerAlign || 'left';
+        if(isSorted) th.classList.add('is-sorted');
+        th.title = `クリックで「${col.label}」で並べ替え`;
+        th.addEventListener('click', () => handleColumnSort(col.key));
 
-        th.style.cssText = `padding:12px 16px; text-align:${headerAlign}; font-weight:600; font-size:0.85rem; color:${sortedColor}; border-bottom:2px solid ${sortedBorder}; white-space:nowrap; width:${width}; cursor:pointer; user-select:none; background:${sortedBg}; transition:background 0.15s, color 0.15s;`;
-
-        th.addEventListener('mouseover', () => { th.style.background = isSorted ? '#e0ecff' : '#eef2ff'; });
-        th.addEventListener('mouseout',  () => { th.style.background = sortedBg; });
-        th.addEventListener('click',     () => handleColumnSort(col.key));
-
-        // ソート方向アイコン
-        let sortIcon = '';
-        if (isSorted) {
-            const dir  = listSortState.direction === 'asc' ? 'up' : 'down';
-            sortIcon = `<i class="fa-solid fa-sort-${dir}" style="margin-left:6px; color:var(--primary); font-size:0.75rem;"></i>`;
-        }
-        th.innerHTML = `<span style="display:inline-flex; align-items:center;">${col.label}${sortIcon}</span>`;
+        // 並べ替え可能であることを、ホバー時の淡いアイコンで伝える
+        const mark = isSorted
+            ? `<i class="fa-solid fa-arrow-${listSortState.direction === 'asc' ? 'up' : 'down'} sort-mark"></i>`
+            : `<i class="fa-solid fa-arrow-down-short-wide sort-mark sort-mark-idle"></i>`;
+        th.innerHTML = `<span style="display:inline-flex; align-items:center;">${escapeHTML(col.label)}${mark}</span>`;
 
         headerRow.appendChild(th);
     });
@@ -121,34 +103,27 @@ function renderAssetsList(list) {
 
     // ソート適用
     let displayList = list;
-    if (listSortState.key && listSortState.direction) {
+    if(listSortState.key && listSortState.direction) {
         displayList = sortAssetList(list, listSortState.key, listSortState.direction);
     }
 
-    // ボディ
     const tbody = document.createElement('tbody');
-
-    displayList.forEach((asset, index) => {
+    displayList.forEach(asset => {
         const row = document.createElement('tr');
-        row.style.cssText = 'cursor:pointer; transition:background 0.15s; border-bottom:1px solid var(--border);';
-        row.onmouseover = () => row.style.background = '#f8fafc';
-        row.onmouseout = () => row.style.background = index % 2 === 0 ? '#fff' : '#fafbfc';
-        row.style.background = index % 2 === 0 ? '#fff' : '#fafbfc';
+        row.tabIndex = 0;
         row.onclick = () => openAssetModal(asset.id);
-        
+        row.onkeydown = (e) => { if(e.key === 'Enter') openAssetModal(asset.id); };
+
         visibleColumns.forEach(col => {
             const td = document.createElement('td');
-            td.style.cssText = `padding:12px 16px; font-size:0.9rem; text-align:${col.align}; overflow:hidden; text-overflow:ellipsis;`;
-            
-            const value = getAssetFieldValue(asset, col.key);
-            td.innerHTML = value;
-            
+            td.style.textAlign = col.align || 'left';
+            td.innerHTML = getAssetFieldValue(asset, col.key);
             row.appendChild(td);
         });
-        
+
         tbody.appendChild(row);
     });
-    
+
     table.appendChild(tbody);
     listWrapper.appendChild(table);
     container.appendChild(listWrapper);
@@ -163,251 +138,197 @@ function calculateColumnWidths(visibleColumns, assetList) {
     let equalCount = 0;
     let flexCount = 0;
     let autoWidths = [];
-    
-    // 各列のタイプを集計
-    visibleColumns.forEach((col, index) => {
+
+    visibleColumns.forEach((col) => {
         if(col.width === 'auto') {
-            // auto: 内容に基づいて幅を計算
             let maxLength = col.label.length;
             assetList.forEach(asset => {
                 const value = getAssetFieldValue(asset, col.key, true);
-                if(value) {
-                    maxLength = Math.max(maxLength, value.toString().length);
-                }
+                if(value) maxLength = Math.max(maxLength, value.toString().length);
             });
-            const calculatedWidth = Math.min(Math.max(maxLength * 10, 80), 500);
-            autoWidths.push(calculatedWidth);
+            autoWidths.push(Math.min(Math.max(maxLength * 10, 90), 460));
         } else if(col.width === 'equal') {
-            equalCount++;
-            autoWidths.push(null);
+            equalCount++; autoWidths.push(null);
         } else if(col.width === 'flex') {
-            flexCount++;
-            autoWidths.push(null);
+            flexCount++; autoWidths.push(null);
         } else if(typeof col.width === 'string' && col.width.endsWith('px')) {
-            const value = parseInt(col.width);
-            fixedTotal += value;
+            fixedTotal += parseInt(col.width);
+            autoWidths.push(null);
+        } else {
             autoWidths.push(null);
         }
     });
-    
+
     const autoTotal = autoWidths.filter(w => w !== null).reduce((sum, w) => sum + w, 0);
-    
-    // 各列の幅を設定
+
     visibleColumns.forEach((col, index) => {
         if(col.width === 'auto') {
             widths.push(`${autoWidths[index]}px`);
-        } else if(col.width === 'equal') {
-            // equal: 全列均等配分（固定幅とauto幅を除く）
-            widths.push(`calc((100% - ${fixedTotal + autoTotal}px) / ${equalCount + flexCount})`);
-        } else if(col.width === 'flex') {
-            // flex: 残り幅を均等配分（equal と同じ）
+        } else if(col.width === 'equal' || col.width === 'flex') {
             widths.push(`calc((100% - ${fixedTotal + autoTotal}px) / ${equalCount + flexCount})`);
         } else if(typeof col.width === 'string' && col.width.endsWith('px')) {
             widths.push(col.width);
         } else {
-            // デフォルト
             widths.push('auto');
         }
     });
-    
+
     return widths;
 }
 
 /**
  * 資産のフィールド値を取得
+ * @param {object} asset
+ * @param {string} key
+ * @param {boolean} [textOnly] - true ならソート・幅計算用のプレーンテキストを返す
  */
 function getAssetFieldValue(asset, key, textOnly = false) {
     const myTags = tags.filter(t => asset.tags.includes(t.id));
     const statusArray = Array.isArray(asset.status) ? asset.status : [asset.status];
-    
-    // テキストを短縮する関数
+
     const truncate = (text, maxLength = 50) => {
         if(!text) return '';
-        if(text.length <= maxLength) return text;
-        return text.substring(0, maxLength) + '...';
+        return text.length <= maxLength ? text : text.substring(0, maxLength) + '…';
     };
-    
+    /** 長文セル：省略表示 + ツールチップで全文（推測させない） */
+    const longText = (text, len = 60) => {
+        if(!text) return '<span class="cell-sub">—</span>';
+        return `<span class="cell-sub" title="${escapeHTML(text)}">${escapeHTML(truncate(text, len))}</span>`;
+    };
+    const tagCell = (list) => {
+        if(list.length === 0) return '<span class="cell-sub">—</span>';
+        const shown = list.slice(0, 3).map(t => `<span class="badge badge-gray">${escapeHTML(t.name)}</span>`).join('');
+        const extra = list.length > 3
+            ? `<span class="badge badge-gray" title="${escapeHTML(list.slice(3).map(t => t.name).join('、'))}">+${list.length - 3}</span>`
+            : '';
+        return `<span class="cell-stack">${shown}${extra}</span>`;
+    };
+
     switch(key) {
         case 'name':
             if(textOnly) return asset.name;
-            return `<div style="font-weight:600; color:var(--text);">${asset.name}</div>`;
-            
+            return `<span class="cell-name">${escapeHTML(asset.name)}</span>`;
+
         case 'id':
             if(textOnly) return asset.id.toUpperCase();
-            return `<div style="font-family:monospace; color:var(--text-sub); font-size:0.85rem;">${asset.id.toUpperCase()}</div>`;
-            
+            return `<span class="cell-mono">${escapeHTML(asset.id.toUpperCase())}</span>`;
+
         case 'date':
-            if(textOnly) return asset.date;
-            return `<div style="color:var(--text-sub);"><i class="fa-regular fa-calendar" style="margin-right:4px;"></i>${asset.date}</div>`;
-            
+            if(textOnly) return asset.date || '';
+            if(!asset.date) return '<span class="cell-sub">—</span>';
+            return `<span class="cell-sub">${escapeHTML(asset.date)}</span>`;
+
         case 'tags':
             if(textOnly) return myTags.map(t => t.name).join(', ');
-            const tagHtml = myTags.slice(0, 3).map(t => 
-                `<span class="badge badge-gray" style="font-size:0.75rem;">${t.name}</span>`
-            ).join('');
-            const extraTag = myTags.length > 3 ? 
-                `<span class="badge badge-gray" style="font-size:0.75rem;">+${myTags.length - 3}</span>` : '';
-            return `<div style="display:flex; gap:4px; flex-wrap:wrap;">${tagHtml}${extraTag}</div>`;
-            
-        // マスタ別タグは default で汎用的に処理
-        
+            return tagCell(myTags);
+
         case 'status':
-            if(textOnly) return statusArray.join(', ');
-            return `<div style="display:flex; gap:4px; flex-wrap:wrap;">${renderStatusBadgesHTML(statusArray)}</div>`;
-            
-        case 'parentAsset':
+            if(textOnly) return statusArray.filter(Boolean).join(', ');
+            if(statusArray.filter(Boolean).length === 0) return '<span class="badge badge-gray">未設定</span>';
+            return `<span class="cell-stack">${renderStatusBadgesHTML(statusArray)}</span>`;
+
+        case 'parentAsset': {
             const parentAsset = getParentAsset(asset.id);
             if(textOnly) return parentAsset ? parentAsset.name : '';
-            if(!parentAsset) {
-                return '<div style="color:var(--text-sub);">-</div>';
-            }
-            return `<div style="color:var(--text); cursor:pointer;" onclick="event.stopPropagation(); openAssetModal('${parentAsset.id}');" title="クリックして親資産を表示">
-                <i class="fa-solid fa-arrow-up" style="margin-right:4px; font-size:0.7rem; opacity:0.6;"></i>${parentAsset.name}
-            </div>`;
-            
+            if(!parentAsset) return '<span class="cell-sub">—</span>';
+            return `<span class="cell-sub" style="cursor:pointer;" onclick="event.stopPropagation(); openAssetModal('${parentAsset.id}');" title="クリックして親資産を開く">
+                <i class="fa-solid fa-arrow-turn-up" style="font-size:0.7rem; opacity:0.6;"></i> ${escapeHTML(parentAsset.name)}
+            </span>`;
+        }
+
         case 'specs':
-            const specs = asset.specs || '';
-            if(textOnly) return specs;
-            const specsText = truncate(specs, 60);
-            return `<div style="color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${specs}">${specsText || '-'}</div>`;
-            
-        // 運用基準・手順
+            if(textOnly) return asset.specs || '';
+            return longText(asset.specs);
+
         case 'operations.procedure':
-            const procedure = asset.operations?.procedure || '';
-            if(textOnly) return procedure;
-            const procText = truncate(procedure, 60);
-            return `<div style="color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${procedure}">${procText || '-'}</div>`;
-            
+            if(textOnly) return asset.operations?.procedure || '';
+            return longText(asset.operations?.procedure);
+
         case 'operations.checkpoints':
-            const checkpoints = asset.operations?.checkpoints || '';
-            if(textOnly) return checkpoints;
-            const checkText = truncate(checkpoints, 60);
-            return `<div style="color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${checkpoints}">${checkText || '-'}</div>`;
-            
-        // リスク管理・安全
+            if(textOnly) return asset.operations?.checkpoints || '';
+            return longText(asset.operations?.checkpoints);
+
         case 'risk.assessment':
-            const assessment = asset.risk?.assessment || '';
-            if(textOnly) return assessment;
-            const assessText = truncate(assessment, 60);
-            return `<div style="color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${assessment}">${assessText || '-'}</div>`;
-            
+            if(textOnly) return asset.risk?.assessment || '';
+            return longText(asset.risk?.assessment);
+
         case 'risk.measures':
-            const measures = asset.risk?.measures || '';
-            if(textOnly) return measures;
-            const measText = truncate(measures, 60);
-            return `<div style="color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${measures}">${measText || '-'}</div>`;
-            
-        // 履歴
-        case 'maintenance.count':
-            const maintCount = asset.maintenance?.length || 0;
-            if(textOnly) return maintCount.toString();
-            return `<div style="color:var(--text-sub);">${maintCount}件</div>`;
-            
-        case 'maintenance.latest':
-            if(!asset.maintenance || asset.maintenance.length === 0) {
-                if(textOnly) return '';
-                return '<div style="color:var(--text-sub);">-</div>';
-            }
-            const sortedMaint = [...asset.maintenance].sort((a, b) => new Date(b.date) - new Date(a.date));
-            const lastDate = sortedMaint[0].date;
-            if(textOnly) return lastDate;
-            return `<div style="color:var(--text-sub);"><i class="fa-solid fa-wrench" style="margin-right:4px;"></i>${lastDate}</div>`;
-            
-        case 'maintenance.latestEvent':
-            if(!asset.maintenance || asset.maintenance.length === 0) {
-                if(textOnly) return '';
-                return '<div style="color:var(--text-sub);">-</div>';
-            }
-            const sortedMaint2 = [...asset.maintenance].sort((a, b) => new Date(b.date) - new Date(a.date));
-            const lastEvent = sortedMaint2[0].event;
-            if(textOnly) return lastEvent;
-            const lastEventText = truncate(lastEvent, 60);
-            return `<div style="color:var(--text-sub);" title="${lastEvent}">${lastEventText}</div>`;
-            
-        // 周期計画
-        case 'scheduledPlans.count':
-            const schedCount = asset.scheduledPlans?.length || 0;
-            if(textOnly) return schedCount.toString();
-            return `<div style="color:var(--text-sub);">${schedCount}件</div>`;
-            
-        case 'scheduledPlans.next':
-            if(!asset.scheduledPlans || asset.scheduledPlans.length === 0) {
-                if(textOnly) return '';
-                return '<div style="color:var(--text-sub);">-</div>';
-            }
-            const today = new Date();
-            const futureSchedules = asset.scheduledPlans
-                .filter(s => new Date(s.date) >= today)
-                .sort((a, b) => new Date(a.date) - new Date(b.date));
-            if(futureSchedules.length === 0) {
-                if(textOnly) return '';
-                return '<div style="color:var(--text-sub);">-</div>';
-            }
-            const nextDate = futureSchedules[0].date;
-            if(textOnly) return nextDate;
-            return `<div style="color:var(--primary);"><i class="fa-regular fa-calendar-check" style="margin-right:4px;"></i>${nextDate}</div>`;
-            
-        case 'scheduledPlans.nextEvent':
-            if(!asset.scheduledPlans || asset.scheduledPlans.length === 0) {
-                if(textOnly) return '';
-                return '<div style="color:var(--text-sub);">-</div>';
-            }
-            const today2 = new Date();
-            const futureSchedules2 = asset.scheduledPlans
-                .filter(s => new Date(s.date) >= today2)
-                .sort((a, b) => new Date(a.date) - new Date(b.date));
-            if(futureSchedules2.length === 0) {
-                if(textOnly) return '';
-                return '<div style="color:var(--text-sub);">-</div>';
-            }
-            const nextEvent = futureSchedules2[0].event;
-            if(textOnly) return nextEvent;
-            const nextEventText = truncate(nextEvent, 60);
-            return `<div style="color:var(--primary);" title="${nextEvent}">${nextEventText}</div>`;
-            
-        // 画像
-        case 'images.count':
-            const imgCount = asset.images?.length || 0;
-            if(textOnly) return imgCount.toString();
-            return `<div style="color:var(--text-sub);"><i class="fa-regular fa-image" style="margin-right:4px;"></i>${imgCount}枚</div>`;
-            
+            if(textOnly) return asset.risk?.measures || '';
+            return longText(asset.risk?.measures);
+
+        case 'maintenance.count': {
+            const c = asset.maintenance?.length || 0;
+            if(textOnly) return String(c);
+            return c === 0 ? '<span class="cell-sub">—</span>' : `<span class="cell-sub">${c}件</span>`;
+        }
+
+        case 'maintenance.latest': {
+            const rec = getLatestMaintenance(asset);
+            if(textOnly) return rec ? rec.date : '';
+            if(!rec) return '<span class="cell-sub">—</span>';
+            return `<span class="cell-sub" title="${escapeHTML(rec.event || '')}">${escapeHTML(rec.date)}</span>`;
+        }
+
+        case 'maintenance.latestEvent': {
+            const rec = getLatestMaintenance(asset);
+            if(textOnly) return rec ? rec.event : '';
+            return longText(rec ? rec.event : '');
+        }
+
+        case 'scheduledPlans.count': {
+            const c = asset.scheduledPlans?.length || 0;
+            if(textOnly) return String(c);
+            return c === 0 ? '<span class="cell-sub">—</span>' : `<span class="cell-sub">${c}件</span>`;
+        }
+
+        case 'scheduledPlans.next': {
+            const next = getNextSchedule(asset);
+            if(textOnly) return next ? next.date : '';
+            if(!next) return '<span class="cell-sub">—</span>';
+            const days = daysUntil(next.date);
+            const tone = days < 0 ? 'var(--danger)' : days <= 7 ? 'var(--warning)' : 'var(--text-sub)';
+            return `<span style="color:${tone};" title="${escapeHTML(next.event || '')}">${escapeHTML(next.date)}<span style="opacity:0.75; margin-left:6px;">${formatDayDelta(days)}</span></span>`;
+        }
+
+        case 'scheduledPlans.nextEvent': {
+            const next = getNextSchedule(asset);
+            if(textOnly) return next ? next.event : '';
+            return longText(next ? next.event : '');
+        }
+
+        case 'images.count': {
+            const c = asset.images?.length || 0;
+            if(textOnly) return String(c);
+            return c === 0 ? '<span class="cell-sub">—</span>' : `<span class="cell-sub"><i class="fa-regular fa-image"></i> ${c}</span>`;
+        }
+
         default:
-            // マスタ別タグ: tags-{masterId}（動的マスタ対応）
+            // マスタ別タグ: tags-{masterId}
             if(key.startsWith('tags-')) {
                 const tagMasterId = key.substring(5);
                 const masterTags = myTags.filter(t => t.masterId === tagMasterId);
                 if(textOnly) return masterTags.map(t => t.name).join(', ');
-                if(masterTags.length === 0) {
-                    return '<div style="color:var(--text-sub);">-</div>';
-                }
-                const masterTagHtml = masterTags.slice(0, 3).map(t => 
-                    `<span class="badge badge-gray" style="font-size:0.75rem;">${t.name}</span>`
-                ).join('');
-                const masterExtraTag = masterTags.length > 3 ? 
-                    `<span class="badge badge-gray" style="font-size:0.75rem;">+${masterTags.length - 3}</span>` : '';
-                return `<div style="display:flex; gap:4px; flex-wrap:wrap;">${masterTagHtml}${masterExtraTag}</div>`;
+                return tagCell(masterTags);
             }
             // カスタムフィールド: custom.{tagId}.{fieldKey}
             if(key.startsWith('custom.')) {
                 const parts = key.split('.');
                 if(parts.length === 3) {
-                    const tagId = parseInt(parts[1]);
-                    const fieldKey = parts[2];
-                    return getCustomFieldValue(asset, tagId, fieldKey, textOnly);
+                    return getCustomFieldValue(asset, parseInt(parts[1]), parts[2], textOnly);
                 }
             }
-            return '-';
+            return textOnly ? '' : '<span class="cell-sub">—</span>';
     }
 }
 
-/**
- * カードビューでレンダリング
- */
+/* ============================================================
+   カードビュー
+   ============================================================ */
+
 function renderAssetsCard(list) {
     const container = document.getElementById('assetContainer');
     container.innerHTML = '';
 
-    // 対象資産が0件の場合は空状態を表示
     if(list.length === 0) {
         renderAssetsEmptyState(container);
         return;
@@ -419,29 +340,37 @@ function renderAssetsCard(list) {
     list.forEach(a => {
         const card = document.createElement('div');
         card.className = 'card';
+        card.tabIndex = 0;
         card.onclick = () => openAssetModal(a.id);
+        card.onkeydown = (e) => { if(e.key === 'Enter') openAssetModal(a.id); };
+
         const myTags = tags.filter(t => a.tags.includes(t.id));
-        const statusBadges = renderStatusBadgesHTML(a.status);
-        const iconClass = getAssetIconClass(a);
+        const statusBadges = (a.status && a.status.length)
+            ? renderStatusBadgesHTML(a.status)
+            : '<span class="badge badge-gray">未設定</span>';
         const thumbnailUrl = getAssetThumbnailUrl(a);
+        const next = getNextSchedule(a);
 
         card.innerHTML = `
             <div class="card-image">
-                ${thumbnailUrl ? `<img src="${thumbnailUrl}" alt="${escapeHTML(a.name)}">` : `<i class="${iconClass}"></i>`}
-                <div class="card-img-tag">${a.id.toUpperCase()}</div>
+                ${thumbnailUrl
+                    ? `<img src="${escapeHTML(thumbnailUrl)}" alt="${escapeHTML(a.name)}" loading="lazy">`
+                    : `<i class="${getAssetIconClass(a)}"></i>`}
+                <div class="card-img-tag">${escapeHTML(a.id.toUpperCase())}</div>
             </div>
             <div class="card-body">
                 <div class="card-header-row">
-                    <h3 class="card-title">${a.name}</h3>
+                    <h3 class="card-title">${escapeHTML(a.name)}</h3>
                 </div>
+                <div style="display:flex; gap:4px; flex-wrap:wrap;">${statusBadges}</div>
                 <div class="card-meta">
-                    <span><i class="fa-regular fa-calendar"></i> ${a.date}</span>
-                </div>
-                <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
-                    ${statusBadges}
+                    <span><i class="fa-regular fa-calendar"></i> ${escapeHTML(a.date || '—')}</span>
+                    ${next ? `<span title="次回予定: ${escapeHTML(next.event || '')}" style="color:${daysUntil(next.date) < 0 ? 'var(--danger)' : 'inherit'};">
+                        <i class="fa-regular fa-clock"></i> ${escapeHTML(formatDayDelta(daysUntil(next.date)))}
+                    </span>` : ''}
                 </div>
                 <div class="tag-row">
-                    ${myTags.slice(0, 3).map(t => `<span class="badge badge-gray">${t.name}</span>`).join('')}
+                    ${myTags.slice(0, 3).map(t => `<span class="badge badge-gray">${escapeHTML(t.name)}</span>`).join('')}
                     ${myTags.length > 3 ? `<span class="badge badge-gray">+${myTags.length - 3}</span>` : ''}
                 </div>
             </div>
@@ -453,205 +382,207 @@ function renderAssetsCard(list) {
 }
 
 /**
- * 資産が0件のときの空状態表示（リスト/カード共通）
+ * 資産が0件のときの表示
+ * 「なぜ0件なのか」と「次に何をすればよいか」を必ず示す。
  */
 function renderAssetsEmptyState(container) {
+    const isFiltered = !!activeFilter || (searchQuery || '').trim() !== '';
+
+    if(isFiltered) {
+        const desc = describeActiveFilter();
+        const reason = [
+            desc ? `${desc.kind}「${desc.label}」` : null,
+            (searchQuery || '').trim() ? `検索語「${searchQuery.trim()}」` : null
+        ].filter(Boolean).join(' と ');
+
+        container.innerHTML = `
+            <div class="panel empty-state">
+                <i class="fa-solid fa-filter-circle-xmark empty-state-icon"></i>
+                <div class="empty-state-title">条件に合う資産がありません</div>
+                <div class="empty-state-desc">${escapeHTML(reason)} に一致する資産は登録されていません</div>
+                <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+                    <button class="btn btn-primary" onclick="clearAllFilters()">
+                        <i class="fa-solid fa-rotate-left"></i> 条件を解除して全件表示
+                    </button>
+                    <button class="btn btn-outline" onclick="createNewAsset()">
+                        <i class="fa-solid fa-plus"></i> この条件で新規登録
+                    </button>
+                </div>
+            </div>`;
+        return;
+    }
+
     container.innerHTML = `
-        <div style="padding:80px 20px; text-align:center; color:var(--text-sub);">
-            <i class="fa-solid fa-box-open" style="font-size:3.5rem; margin-bottom:16px; display:block; opacity:0.25;"></i>
-            <div style="font-size:1.05rem; font-weight:600; margin-bottom:6px;">表示できる資産がありません</div>
-            <div style="font-size:0.88rem; opacity:0.8; margin-bottom:20px;">検索条件・フィルタを変更するか、新しい資産を登録してください</div>
-            <button class="btn btn-primary" onclick="createNewAsset()">
-                <i class="fa-solid fa-plus"></i> 新規資産を登録
-            </button>
-        </div>
-    `;
+        <div class="panel empty-state">
+            <i class="fa-solid fa-box-open empty-state-icon"></i>
+            <div class="empty-state-title">まだ資産が登録されていません</div>
+            <div class="empty-state-desc">最初の1件を登録するか、バックアップのJSONを読み込んでください</div>
+            <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="createNewAsset()">
+                    <i class="fa-solid fa-plus"></i> 新規資産を登録
+                </button>
+                <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">
+                    <i class="fa-solid fa-file-arrow-up"></i> JSONから読み込む
+                </button>
+            </div>
+        </div>`;
 }
+
+/* ============================================================
+   カレンダービュー
+   ============================================================ */
 
 function renderAssetsCalendar(assetList) {
     const container = document.getElementById('assetContainer');
     container.innerHTML = '';
-    
+
     const year = currentCalendarDate.getFullYear();
     const month = currentCalendarDate.getMonth();
-    
-    // カレンダーイベントを収集
-    const events = [];
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
+    // 予定イベントを収集
+    const events = [];
     assetList.forEach(asset => {
-        if(asset.scheduledPlans && asset.scheduledPlans.length > 0) {
-            asset.scheduledPlans.forEach(plan => {
-                const planDate = new Date(plan.date);
-                planDate.setHours(0, 0, 0, 0);
-                
-                let eventType = 'upcoming-event';
-                
-                if(planDate < today) {
-                    if(plan.cycle) {
-                        const daysPassed = Math.floor((today - planDate) / (1000 * 60 * 60 * 24));
-                        if(daysPassed > plan.cycle) {
-                            eventType = 'overdue-event';
-                        } else {
-                            eventType = 'past-event';
-                        }
-                    } else {
-                        eventType = 'past-event';
-                    }
+        (asset.scheduledPlans || []).forEach(plan => {
+            const planDate = new Date(plan.date);
+            planDate.setHours(0, 0, 0, 0);
+
+            let eventType = 'upcoming-event';
+            if(planDate < today) {
+                if(plan.cycle) {
+                    const daysPassed = Math.floor((today - planDate) / 86400000);
+                    eventType = daysPassed > plan.cycle ? 'overdue-event' : 'past-event';
+                } else {
+                    eventType = 'past-event';
                 }
-                
-                events.push({
-                    date: plan.date,
-                    asset: asset,
-                    event: plan.event,
-                    type: eventType,
-                    cycle: plan.cycle
-                });
-            });
-        }
+            }
+            events.push({ date: plan.date, asset, event: plan.event, type: eventType, cycle: plan.cycle });
+        });
     });
-    
-    // カレンダー構造を作成
+
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const startDay = firstDay.getDay();
     const daysInMonth = lastDay.getDate();
-    
-    const prevMonth = new Date(year, month, 0);
-    const daysInPrevMonth = prevMonth.getDate();
-    
-    let calendarHTML = `
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    const dayLabels = ['日', '月', '火', '水', '木', '金', '土'];
+
+    let html = `
         <div class="calendar-wrapper">
             <div class="calendar-header-bar">
                 <div class="calendar-nav-controls">
-                    <button class="btn btn-ghost btn-sm" onclick="changeCalendarMonth(-1)">
+                    <button class="btn btn-ghost btn-icon-only btn-sm" onclick="changeCalendarMonth(-1)" title="前の月" aria-label="前の月">
                         <i class="fa-solid fa-chevron-left"></i>
                     </button>
                     <div class="calendar-month-title">${year}年 ${month + 1}月</div>
-                    <button class="btn btn-ghost btn-sm" onclick="changeCalendarMonth(1)">
+                    <button class="btn btn-ghost btn-icon-only btn-sm" onclick="changeCalendarMonth(1)" title="次の月" aria-label="次の月">
                         <i class="fa-solid fa-chevron-right"></i>
                     </button>
+                    <button class="btn btn-outline btn-sm" onclick="goToCurrentMonth()">今月</button>
                 </div>
-                <button class="btn btn-outline btn-sm" onclick="currentCalendarDate = new Date(); renderAssets(window.currentAssetList || assets)">
-                    <i class="fa-solid fa-calendar-day"></i> 今月
-                </button>
+                <div class="calendar-legend">
+                    <span><i style="background:var(--red-200);"></i> 期限超過</span>
+                    <span><i style="background:var(--blue-200);"></i> 今後の予定</span>
+                    <span><i style="background:var(--slate-200);"></i> 実施済みの予定日</span>
+                </div>
             </div>
             <div class="calendar-grid">
-                <div class="calendar-day-label">日</div>
-                <div class="calendar-day-label">月</div>
-                <div class="calendar-day-label">火</div>
-                <div class="calendar-day-label">水</div>
-                <div class="calendar-day-label">木</div>
-                <div class="calendar-day-label">金</div>
-                <div class="calendar-day-label">土</div>
+                ${dayLabels.map((d, i) => `<div class="calendar-day-label ${i === 0 ? 'is-sun' : i === 6 ? 'is-sat' : ''}">${d}</div>`).join('')}
     `;
-    
-    // 前月の日
+
+    // 前月
     for(let i = startDay - 1; i >= 0; i--) {
-        const day = daysInPrevMonth - i;
-        calendarHTML += `
-            <div class="calendar-day-cell other-month-day">
-                <div class="day-num">${day}</div>
-            </div>
-        `;
+        html += `<div class="calendar-day-cell other-month-day"><div class="day-num">${daysInPrevMonth - i}</div></div>`;
     }
-    
-    // 当月の日
+
+    // 当月
     for(let day = 1; day <= daysInMonth; day++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const dayEvents = events.filter(e => e.date === dateStr);
-        
         const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
-        
-        calendarHTML += `
+
+        html += `
             <div class="calendar-day-cell ${isToday ? 'today-cell' : ''}">
                 <div class="day-num">${day}</div>
                 <div class="calendar-events-list">
                     ${dayEvents.slice(0, 3).map(e => `
-                        <div class="calendar-event-item ${e.type}" onclick="openAssetModal('${e.asset.id}')" title="${e.asset.name}: ${e.event}">
-                            ${e.asset.name}
-                        </div>
-                    `).join('')}
-                    ${dayEvents.length > 3 ? `<div class="calendar-event-item" style="background: #e2e8f0; color: #64748b;">+${dayEvents.length - 3}件</div>` : ''}
+                        <div class="calendar-event-item ${e.type}" onclick="openAssetModal('${e.asset.id}')"
+                             title="${escapeHTML(e.asset.name)}：${escapeHTML(e.event || '')}">
+                            ${escapeHTML(e.asset.name)}
+                        </div>`).join('')}
+                    ${dayEvents.length > 3
+                        ? `<div class="calendar-event-item" style="background:var(--surface-muted); color:var(--text-sub);">+${dayEvents.length - 3}件</div>`
+                        : ''}
                 </div>
-            </div>
-        `;
+            </div>`;
     }
-    
-    // 次月の日
-    const totalCells = startDay + daysInMonth;
-    const remainingCells = 42 - totalCells;
+
+    // 次月
+    const remainingCells = 42 - (startDay + daysInMonth);
     for(let day = 1; day <= remainingCells; day++) {
-        calendarHTML += `
-            <div class="calendar-day-cell other-month-day">
-                <div class="day-num">${day}</div>
-            </div>
-        `;
+        html += `<div class="calendar-day-cell other-month-day"><div class="day-num">${day}</div></div>`;
     }
-    
-    calendarHTML += `
-            </div>
-        </div>
-    `;
-    
-    container.innerHTML = calendarHTML;
+
+    html += `</div></div>`;
+    container.innerHTML = html;
 }
 
 function changeCalendarMonth(delta) {
     currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
-    renderAssets(window.currentAssetList || assets);
+    applyFilters();
+}
+
+function goToCurrentMonth() {
+    currentCalendarDate = new Date();
+    applyFilters();
 }
 
 /* ============================================================
- * カラムソート
- * ============================================================ */
+   カラムソート
+   ============================================================ */
 
 /**
  * ヘッダークリック時のソート状態遷移を管理し、再レンダリングする
  * 遷移: 昇順 → 降順 → なし → (次の列クリックで昇順)
- * @param {string} key - ソート対象のカラムキー
  */
 function handleColumnSort(key) {
-    if (listSortState.key === key) {
-        if (listSortState.direction === 'asc') {
+    if(listSortState.key === key) {
+        if(listSortState.direction === 'asc') {
             listSortState.direction = 'desc';
         } else {
-            // 降順の次 → ソート解除
-            listSortState.key      = null;
+            listSortState.key = null;
             listSortState.direction = null;
         }
     } else {
-        listSortState.key      = key;
+        listSortState.key = key;
         listSortState.direction = 'asc';
     }
-    renderAssets(window.currentAssetList || assets);
+    applyFilters();
 }
 
 /**
  * 資産リストをソートして新しい配列を返す
- * @param {Array}  list          ソート対象の配列
- * @param {string} sortKey       ソートカラムキー
- * @param {string} sortDirection 'asc' | 'desc'
- * @returns {Array} ソート済み配列
  */
 function sortAssetList(list, sortKey, sortDirection) {
-    if (!sortKey || !sortDirection) return list;
+    if(!sortKey || !sortDirection) return list;
 
     return [...list].sort((a, b) => {
         let valA = getAssetFieldValue(a, sortKey, true) || '';
         let valB = getAssetFieldValue(b, sortKey, true) || '';
 
-        // 空値は末尾へ
-        if (!valA && valB)  return  1;
-        if (valA && !valB)  return -1;
-        if (!valA && !valB) return  0;
+        // 空値は常に末尾へ（並べ替えの向きに関わらず）
+        if(!valA && valB)  return  1;
+        if(valA && !valB)  return -1;
+        if(!valA && !valB) return  0;
 
         // IDカラム: 数値部分で比較 (A1, A2, A10 → 1, 2, 10)
-        if (sortKey === 'id') {
+        if(sortKey === 'id') {
             const numA = parseInt(valA.replace(/\D/g, ''), 10);
             const numB = parseInt(valB.replace(/\D/g, ''), 10);
-            if (!isNaN(numA) && !isNaN(numB)) {
+            if(!isNaN(numA) && !isNaN(numB)) {
                 return sortDirection === 'asc' ? numA - numB : numB - numA;
             }
         }
@@ -659,15 +590,12 @@ function sortAssetList(list, sortKey, sortDirection) {
         // 数値カラム: 両方が正規の数値文字列なら数値比較
         const numA = parseFloat(valA);
         const numB = parseFloat(valB);
-        if (!isNaN(numA) && !isNaN(numB) && String(numA) === valA.trim() && String(numB) === valB.trim()) {
+        if(!isNaN(numA) && !isNaN(numB) && String(numA) === valA.trim() && String(numB) === valB.trim()) {
             return sortDirection === 'asc' ? numA - numB : numB - numA;
         }
 
-        // それ以外: 日付(YYYY-MM-DD)も文字列ソートで正しくなるため、全て localeCompare で統一
+        // それ以外: 日付(YYYY-MM-DD)も文字列ソートで正しくなるため localeCompare で統一
         const cmp = valA.toString().localeCompare(valB.toString(), 'ja');
         return sortDirection === 'asc' ? cmp : -cmp;
     });
 }
-
-
-

@@ -137,22 +137,49 @@ function openAssetModalWithData(asset) {
     // 画像タブ
     document.getElementById('newImageUrl').value = '';
     document.getElementById('newImageComment').value = '';
+    document.getElementById('imageUrlForm').style.display = 'none';
     renderImagesGallery();
     setupImageDropZone(); // ドロップゾーンをセットアップ
-    
+
     // 新規作成時は削除ボタンを「キャンセル」に変更
     const deleteBtn = document.getElementById('deleteAssetBtn');
     if(isNewAsset) {
-        deleteBtn.innerHTML = '<i class="fa-solid fa-xmark"></i> キャンセル';
-        deleteBtn.className = 'btn btn-outline';
+        deleteBtn.innerHTML = '<i class="fa-solid fa-xmark"></i> 破棄';
+        deleteBtn.className = 'btn btn-ghost btn-sm';
     } else {
         deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i> 削除';
-        deleteBtn.className = 'btn btn-danger-ghost';
+        deleteBtn.className = 'btn btn-danger-ghost btn-sm';
     }
-    
+
+    // 見出し下の補助情報（登録日・画像枚数など、開く前に知りたい概要）
+    const metaEl = document.getElementById('modalAssetMeta');
+    if(metaEl) {
+        const childCount = getChildAssets(asset.id).length;
+        const parts = [];
+        if(asset.date) parts.push(`導入 ${asset.date}`);
+        if(asset.images.length > 0) parts.push(`画像 ${asset.images.length}枚`);
+        if(childCount > 0) parts.push(`構成パーツ ${childCount}件`);
+        metaEl.textContent = parts.length ? '· ' + parts.join(' · ') : '';
+    }
+
     renderDynamicMasterInputs();
     renderCustomFieldInputs(); // カスタムフィールド入力フォームを描画
+    updateAssetTabCounts();
+    updateUnsavedFlag();
+
+    // 常に基本情報タブから開始する（前回開いたタブが残っていると現在地を見失う）
+    const firstTab = document.querySelector('#assetModal .tabs .tab');
+    if(firstTab) switchTab(firstTab, 'tabBasic');
+
     document.getElementById('assetModal').classList.add('open');
+
+    // 新規作成時は最初の入力欄にカーソルを置く（次に何をすべきかを示す）
+    if(isNewAsset) {
+        setTimeout(() => {
+            const nameEl = document.getElementById('editAssetName');
+            if(nameEl) { nameEl.focus(); nameEl.select(); }
+        }, 50);
+    }
 }
 
 function checkFieldChange(element, originalValue) {
@@ -161,44 +188,112 @@ function checkFieldChange(element, originalValue) {
     } else {
         removeChangeHighlight(element);
     }
+    updateUnsavedFlag();
 }
 
 function checkStatusChange() {
     const currentStatus = Array.from(document.querySelectorAll('.status-checkbox:checked'))
         .map(cb => cb.value).sort();
-    const originalStatus = [...originalAssetData.status].sort();
-    
+    const originalStatus = [...(originalAssetData.status || [])].sort();
+
     const changed = currentStatus.length !== originalStatus.length ||
                    currentStatus.some((s, i) => s !== originalStatus[i]);
-    
-    const container = document.querySelector('.status-checkbox').closest('div').parentElement;
-    if(changed) {
-        addChangeHighlight(container);
-    } else {
-        removeChangeHighlight(container);
+
+    const container = document.getElementById('statusCheckboxContainer');
+    if(container) {
+        if(changed) addChangeHighlight(container);
+        else removeChangeHighlight(container);
     }
+    updateUnsavedFlag();
 }
 
 function addChangeHighlight(element) {
-    element.style.backgroundColor = '#fef3c7'; // 薄い黄色
-    element.style.transition = 'background-color 0.3s';
+    if(element) element.classList.add('is-changed');
 }
 
 function removeChangeHighlight(element) {
-    element.style.backgroundColor = '';
+    if(element) element.classList.remove('is-changed');
+}
+
+/**
+ * 未保存の変更があるかどうかを判定する
+ * 保存前に閉じようとしたときの確認と、ヘッダーの未保存表示に使う。
+ */
+function hasUnsavedAssetChanges() {
+    if(!editingAssetId) return false;
+    if(isNewAsset) return true; // 新規作成中は常に「未保存」
+    if(!originalAssetData || !originalAssetData.tags) return false;
+
+    const val = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.value : '';
+    };
+
+    if(val('editAssetName') !== originalAssetData.name) return true;
+    if(val('editAssetDate') !== originalAssetData.date) return true;
+    if(val('editAssetSpecs') !== (originalAssetData.specs || '')) return true;
+    if(val('editOperationsProcedure') !== originalAssetData.operations.procedure) return true;
+    if(val('editOperationsCheckpoints') !== originalAssetData.operations.checkpoints) return true;
+    if(val('editRiskAssessment') !== originalAssetData.risk.assessment) return true;
+    if(val('editRiskMeasures') !== originalAssetData.risk.measures) return true;
+
+    const currentStatus = Array.from(document.querySelectorAll('.status-checkbox:checked')).map(cb => cb.value).sort();
+    const originalStatus = [...(originalAssetData.status || [])].sort();
+    if(currentStatus.join('|') !== originalStatus.join('|')) return true;
+
+    const currentTags = [...editingTags].sort().join('|');
+    const originalTags = [...originalAssetData.tags].sort().join('|');
+    if(currentTags !== originalTags) return true;
+
+    return false;
+}
+
+/**
+ * ヘッダーの「未保存の変更があります」表示を更新する
+ */
+function updateUnsavedFlag() {
+    const flag = document.getElementById('assetUnsavedFlag');
+    if(!flag) return;
+    flag.classList.toggle('show', !isNewAsset && hasUnsavedAssetChanges());
+}
+
+/**
+ * タブのラベルに件数を出す
+ * 中身があるタブが一目で分かれば、順番に開いて確かめる必要がなくなる。
+ */
+function updateAssetTabCounts() {
+    const asset = assets.find(a => a.id === editingAssetId);
+    if(!asset) return;
+
+    const set = (id, count) => {
+        const el = document.getElementById(id);
+        if(!el) return;
+        el.textContent = count;
+        const tab = el.closest('.tab');
+        if(tab) tab.classList.toggle('is-empty', count === 0);
+    };
+
+    set('tabCountImages', asset.images?.length || 0);
+    set('tabCountComponents', getChildAssets(asset.id).length);
+    set('tabCountSchedule', asset.scheduledPlans?.length || 0);
+    set('tabCountMaint', asset.maintenance?.length || 0);
 }
 
 /**
  * ステータスチェックボックスをSTATUS_DEFSから動的に生成
+ * 当たり判定の広いチップ型にして、選択中は色で分かるようにする。
  */
 function renderStatusCheckboxes() {
     const container = document.getElementById('statusCheckboxContainer');
     if(!container) return;
 
     container.innerHTML = STATUS_DEFS.map(def => `
-        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:0.9rem;">
-            <input type="checkbox" class="status-checkbox" value="${escapeHTML(def.value)}" style="width:18px; height:18px; cursor:pointer;">
-            <span>${escapeHTML(def.value)}</span>
+        <label class="choice">
+            <input type="checkbox" class="status-checkbox" value="${escapeHTML(def.value)}">
+            <span style="display:inline-flex; align-items:center; gap:6px;">
+                <span style="width:8px; height:8px; border-radius:50%; background:${def.nodeColor};"></span>
+                ${escapeHTML(def.value)}
+            </span>
         </label>
     `).join('');
 }
@@ -241,7 +336,8 @@ function renderDynamicMasterInputs() {
         wrapper.style.gridColumn = 'span 1';
         
         const label = document.createElement('label');
-        label.style.cssText = 'font-size:0.85rem; font-weight:700; color:var(--text-sub); display:block; margin-bottom:6px;';
+        label.className = 'field-label';
+        label.style.marginBottom = '6px';
         label.innerText = m.name;
         wrapper.appendChild(label);
 
@@ -319,6 +415,7 @@ function checkTagsChange() {
             }
         }
     });
+    updateUnsavedFlag();
 }
 
 function setupDynamicTagSearch(masterId, input, dropdown) {
@@ -336,14 +433,15 @@ function setupDynamicTagSearch(masterId, input, dropdown) {
             matches.slice(0, limit).forEach(t => {
                 const item = document.createElement('div');
                 item.className = 'tag-dropdown-item';
+                // 階層の位置（親の名前）を添えて、同名タグの取り違えを防ぐ
                 let parentName = '';
                 if(t.parentIds.length > 0) {
                     const p = tags.find(pt => pt.id === t.parentIds[0]);
-                    if(p) parentName = `<span class="tag-path">${p.name} / </span>`;
+                    if(p) parentName = `<span class="tag-path">${escapeHTML(p.name)} の下</span>`;
                 }
-                item.innerHTML = `<span>${t.name}</span> ${parentName}`;
+                item.innerHTML = `<span>${escapeHTML(t.name)}</span>${parentName}`;
                 item.onclick = (e) => {
-                    e.stopPropagation(); 
+                    e.stopPropagation();
                     editingTags.push(t.id);
                     renderChipsForMaster(masterId);
                     checkTagsChange(); // タグ変更を検知
@@ -353,6 +451,14 @@ function setupDynamicTagSearch(masterId, input, dropdown) {
                 };
                 dropdown.appendChild(item);
             });
+            dropdown.classList.add('show');
+        } else if(needle !== '') {
+            // 候補ゼロを黙って閉じると「壊れている」と受け取られる。理由と次の手を示す。
+            dropdown.innerHTML = `
+                <div class="tag-dropdown-empty">
+                    「${escapeHTML(val)}」に一致するタグはありません。<br>
+                    タグの追加は「マスタ・タグ設定」から行えます。
+                </div>`;
             dropdown.classList.add('show');
         } else {
             dropdown.classList.remove('show');
@@ -369,16 +475,26 @@ function setupDynamicTagSearch(masterId, input, dropdown) {
     });
 }
 
+/**
+ * 新規資産の下書きを作って編集モーダルを開く
+ * 下書きは一時IDで assets に置かれ、保存するまで一覧・統計には現れない。
+ */
 function createNewAsset() {
+    // 別の資産を編集中に上書きしてしまわないよう、先に確認する
+    if(document.getElementById('assetModal').classList.contains('open')) {
+        closeModal('assetModal');
+        if(document.getElementById('assetModal').classList.contains('open')) return; // 閉じるのを取り消した
+    }
+
     isNewAsset = true;
     const newId = 'temp_' + Date.now(); // 一時ID
     editingAssetId = newId;
     
     // 仮の新規資産オブジェクトを作成してassetsに追加（編集中にデータを保持するため）
-    const newAsset = { 
-        id: newId, 
-        name: '新規資産', 
-        tags: [], 
+    const newAsset = {
+        id: newId,
+        name: '',
+        tags: [],
         status: [], // ステータスなし
         date: new Date().toISOString().split('T')[0], 
         specs: '',
@@ -394,14 +510,31 @@ function createNewAsset() {
     
     assets.push(newAsset); // 一時的に追加
     openAssetModalWithData(newAsset);
+
+    // 見出しは「資産詳細」ではなく、これから何をするかを示す
+    document.getElementById('modalTitle').innerText = '新規資産の登録';
+    document.getElementById('modalAssetId').innerText = '保存すると資産IDが発行されます';
+    const metaEl = document.getElementById('modalAssetMeta');
+    if(metaEl) metaEl.textContent = '';
 }
 
 function saveAssetChanges() {
     if(!editingAssetId) return;
-    
+
     // 現在編集中の一時資産(新規)または既存資産を取得
     const currentEditingAsset = assets.find(a => a.id === editingAssetId);
     if(!currentEditingAsset) return;
+
+    // 資産名は一覧・検索・グラフのすべてで識別子として使われるため必須
+    const nameInput = document.getElementById('editAssetName');
+    if(!nameInput.value.trim()) {
+        const basicTab = document.querySelector('#assetModal .tabs .tab');
+        if(basicTab) switchTab(basicTab, 'tabBasic');
+        nameInput.focus();
+        addChangeHighlight(nameInput);
+        showToast('資産名称を入力してください', 'warning');
+        return;
+    }
 
     // 現在の画像データを確保
     const currentImages = currentEditingAsset.images ? JSON.parse(JSON.stringify(currentEditingAsset.images)) : [];
@@ -419,7 +552,7 @@ function saveAssetChanges() {
             // 新しい資産オブジェクトを作成
             const newAsset = {
                 id: newId,
-                name: document.getElementById('editAssetName').value,
+                name: document.getElementById('editAssetName').value.trim(),
                 date: document.getElementById('editAssetDate').value,
                 status: Array.from(document.querySelectorAll('.status-checkbox:checked'))
                     .map(cb => cb.value),
@@ -443,26 +576,18 @@ function saveAssetChanges() {
             };
             
             // 全データに追加
+            // 表示リストは applyFilters() が assets から再計算するため、
+            // 個別のリストへ手で足し込む必要はない。
             assets.push(newAsset);
 
-            // ★重要: 現在表示中のリスト（フィルタ中など）にも追加して即座に見えるようにする
-            // これがないと、フィルタ適用中に新規作成してもリストに出てこない場合がある
-            if (window.currentAssetList) {
-                window.currentAssetList.push(newAsset);
-            }
-            // 検索中の場合は検索の起点リストにも追加（検索解除時に消えないように）
-            if (typeof searchBaseList !== 'undefined' && Array.isArray(searchBaseList) && searchBaseList !== window.currentAssetList) {
-                searchBaseList.push(newAsset);
-            }
-
             isNewAsset = false;
-            showToast('新規資産を登録しました', 'success');
+            showToast(`「${newAsset.name}」を登録しました`, 'success');
 
         } else {
             // 既存資産の更新（オブジェクトの参照を直接書き換える）
-            const asset = currentEditingAsset; 
-            
-            asset.name = document.getElementById('editAssetName').value;
+            const asset = currentEditingAsset;
+
+            asset.name = document.getElementById('editAssetName').value.trim();
             asset.date = document.getElementById('editAssetDate').value;
             asset.status = Array.from(document.querySelectorAll('.status-checkbox:checked'))
                 .map(cb => cb.value);
@@ -490,21 +615,19 @@ function saveAssetChanges() {
             // カスタムフィールド値を保存
             asset.customAttributes = collectCustomFieldValues();
             
-            showToast('資産情報を保存しました');
+            showToast(`「${asset.name}」を保存しました`, 'success');
         }
-        
-        // ★重要: 画面の再描画
-        // 更新されたデータ（assets または window.currentAssetList）を使ってリストを更新
-        renderAssets(window.currentAssetList || assets);
-        
-        // ダッシュボード表示中ならダッシュボードも更新（数値の変化を反映）
-        if (currentPage === 'dashboard') {
-            renderDashboard();
-        }
-        
-        closeModal('assetModal');
-        autoSaveData(); // 自動保存
-        
+
+        // 保存が完了したので、閉じる際の未保存確認は出さない
+        originalAssetData = {};
+        editingAssetId = null;
+        document.getElementById('assetModal').classList.remove('open');
+
+        // 現在の絞り込み条件で画面を再構築（タグを変えた結果も正しく反映される）
+        renderSidebar();
+        refreshCurrentView();
+        autoSaveData();
+
     } catch(error) {
         // バリデーションエラーの場合はモーダルを閉じない
         if(error.message === 'Validation failed') {
@@ -518,39 +641,41 @@ function saveAssetChanges() {
 
 function deleteCurrentAsset() {
     if(isNewAsset) {
-        // 新規作成中の場合は一時資産を削除してキャンセル
+        // 新規作成中の場合は一時資産を破棄
         assets = assets.filter(a => a.id !== editingAssetId);
-        closeModal('assetModal');
-        showToast('登録をキャンセルしました', 'info');
+        isNewAsset = false;
+        editingAssetId = null;
+        originalAssetData = {};
+        document.getElementById('assetModal').classList.remove('open');
+        refreshCurrentView();
+        showToast('入力内容を破棄しました', 'info');
         return;
     }
-    
-    if(confirm('この資産を削除してもよろしいですか？')) {
-        // 1. 全データから削除
-        assets = assets.filter(a => a.id !== editingAssetId);
-        
-        // 2. ★重要: 現在表示中のリスト（フィルタ結果）からも削除
-        // これを行わないと、renderAssetsに古い配列（削除対象を含む）が渡されて表示が残る
-        if (window.currentAssetList) {
-            window.currentAssetList = window.currentAssetList.filter(a => a.id !== editingAssetId);
-        }
-        // 検索中の場合は検索の起点リストからも削除
-        if (typeof searchBaseList !== 'undefined' && Array.isArray(searchBaseList)) {
-            searchBaseList = searchBaseList.filter(a => a.id !== editingAssetId);
-        }
 
-        // 3. 画面再描画
-        renderAssets(window.currentAssetList || assets);
+    const target = assets.find(a => a.id === editingAssetId);
+    if(!target) return;
 
-        // ダッシュボード表示中ならダッシュボードも更新
-        if (currentPage === 'dashboard') {
-            renderDashboard();
-        }
+    // 影響範囲（子資産）を事前に伝える。削除して初めて気づく事態を避ける。
+    const children = getChildAssets(target.id);
+    const warning = children.length > 0
+        ? `\n\nこの資産には構成パーツが${children.length}件あります。\nそれらの「所属先」は未設定になります。`
+        : '';
 
-        closeModal('assetModal');
-        showToast('資産を削除しました', 'success');
-        autoSaveData(); // 自動保存
-    }
+    if(!confirm(`「${target.name}」を削除しますか？${warning}\n\nこの操作は取り消せません。`)) return;
+
+    // 子資産の親参照を外してから削除する（存在しない親を指したままにしない）
+    children.forEach(child => { child.parentId = null; });
+    assets = assets.filter(a => a.id !== editingAssetId);
+
+    isNewAsset = false;
+    editingAssetId = null;
+    originalAssetData = {};
+    document.getElementById('assetModal').classList.remove('open');
+
+    renderSidebar();
+    refreshCurrentView();
+    showToast(`「${target.name}」を削除しました`, 'success');
+    autoSaveData();
 }
 
 // closeModal は js/ui.js で定義（旧版ではここに重複定義があったため統合）
@@ -558,15 +683,15 @@ function deleteCurrentAsset() {
 function switchTab(el, tabId) {
     el.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
-    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('#assetModal .tab-pane').forEach(p => p.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
-    
+
     // 画像タブに切り替えた時はギャラリーを再描画＆ドロップゾーンをセットアップ
     if(tabId === 'tabImages') {
         renderImagesGallery();
         setupImageDropZone();
     }
-    
+
     // 構成パーツタブに切り替えた時は子資産一覧を描画
     if(tabId === 'tabComponents') {
         renderComponentsList();
@@ -580,42 +705,37 @@ function renderParentAssetSelection(currentParentId) {
     const container = document.getElementById('parentAssetSelectContainer');
     if(!container) return;
     
-    container.innerHTML = '';
-    
-    // 親資産情報の表示
     const parentAsset = getParentAsset(editingAssetId);
-    
-    const infoDiv = document.createElement('div');
-    infoDiv.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:12px; background:#f8fafc; border:1px solid var(--border); border-radius:var(--radius-md);';
-    
+
     if(!parentAsset) {
-        infoDiv.innerHTML = `
-            <div style="display:flex; align-items:center; gap:8px; color:var(--text-sub);">
-                <i class="fa-solid fa-sitemap" style="font-size:1.2rem; opacity:0.5;"></i>
-                <span style="font-size:0.9rem;">親資産なし（トップレベル資産）</span>
-            </div>
-            <button class="btn btn-outline btn-sm" onclick="openAssetStructureModal()">
-                <i class="fa-solid fa-diagram-project"></i> 構成管理で設定
-            </button>
-        `;
-    } else {
-        infoDiv.innerHTML = `
-            <div style="flex:1;">
-                <div style="font-size:0.75rem; color:var(--text-sub); margin-bottom:4px;">親資産</div>
-                <div style="font-weight:600; font-size:0.95rem; color:var(--text); cursor:pointer;" 
-                     onclick="openAssetModal('${parentAsset.id}')" 
-                     title="クリックして親資産を表示">
-                    <i class="fa-solid fa-arrow-up" style="margin-right:4px; font-size:0.8rem; opacity:0.6;"></i>
-                    ${parentAsset.name} <span style="font-size:0.8rem; color:var(--text-sub);">(${parentAsset.id.toUpperCase()})</span>
+        container.innerHTML = `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-3); background:var(--surface-sunken); border:1px solid var(--border); border-radius:var(--radius-md);">
+                <span style="display:flex; align-items:center; gap:var(--space-2); color:var(--text-sub); font-size:var(--text-sm);">
+                    <i class="fa-solid fa-sitemap" style="opacity:0.5;"></i>
+                    どの資産にも属していません（最上位の資産です）
+                </span>
+                <button class="btn btn-outline btn-sm" onclick="openAssetStructureModal()">
+                    <i class="fa-solid fa-diagram-project"></i> 所属先を設定
+                </button>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-3); background:var(--surface-sunken); border:1px solid var(--border); border-radius:var(--radius-md);">
+            <div style="min-width:0;">
+                <div class="field-label" style="margin-bottom:2px;">所属先</div>
+                <div style="font-weight:600; cursor:pointer; color:var(--primary);"
+                     onclick="openAssetModal('${parentAsset.id}')" title="クリックして親資産を開く">
+                    <i class="fa-solid fa-arrow-turn-up" style="font-size:0.75rem; opacity:0.7;"></i>
+                    ${escapeHTML(parentAsset.name)}
+                    <span style="font-size:var(--text-xs); color:var(--text-sub); font-family:var(--font-mono);">${escapeHTML(parentAsset.id.toUpperCase())}</span>
                 </div>
             </div>
             <button class="btn btn-outline btn-sm" onclick="openAssetStructureModal()">
-                <i class="fa-solid fa-diagram-project"></i> 構成管理で変更
+                <i class="fa-solid fa-diagram-project"></i> 変更
             </button>
-        `;
-    }
-    
-    container.appendChild(infoDiv);
+        </div>`;
 }
 
 /**
@@ -654,12 +774,15 @@ function renderComponentsList() {
     
     if(childAssets.length === 0) {
         container.innerHTML = `
-            <div style="padding:40px 20px; text-align:center; color:var(--text-sub);">
-                <i class="fa-solid fa-box-open" style="font-size:2.5rem; opacity:0.3; display:block; margin-bottom:12px;"></i>
-                <div style="font-size:0.95rem;">この資産には構成パーツ（子資産）が登録されていません</div>
-                <div style="font-size:0.85rem; margin-top:8px; opacity:0.7;">
-                    別の資産を編集して、その親資産にこの資産を指定することで構成パーツとして追加できます。
+            <div class="empty-state" style="padding:var(--space-8) var(--space-5);">
+                <i class="fa-solid fa-cubes-stacked empty-state-icon"></i>
+                <div class="empty-state-title">構成パーツはまだありません</div>
+                <div class="empty-state-desc">
+                    「構成を編集」から、この資産の下にぶら下げる資産をつなげられます
                 </div>
+                <button class="btn btn-primary btn-sm" onclick="openAssetStructureModal()">
+                    <i class="fa-solid fa-diagram-project"></i> 構成を編集
+                </button>
             </div>
         `;
     } else {
@@ -706,9 +829,9 @@ function renderComponentsList() {
         
         if(!parentAsset) {
             parentContainer.innerHTML = `
-                <div style="padding:20px; text-align:center; color:var(--text-sub); font-size:0.9rem;">
-                    <i class="fa-solid fa-sitemap" style="font-size:1.5rem; opacity:0.3; display:block; margin-bottom:8px;"></i>
-                    この資産は親資産に所属していません（トップレベル資産）
+                <div class="hint hint-neutral">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span>この資産はどこにも属していない最上位の資産です。「構成を編集」から所属先を設定できます。</span>
                 </div>
             `;
         } else {

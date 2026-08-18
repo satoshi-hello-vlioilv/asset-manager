@@ -1,0 +1,260 @@
+/**
+ * patterns.css
+ * 「探させない・思い出させない・推測させない」ための新しいUIパターン
+ *
+ * - command-palette : Ctrl+K で資産・タグ・操作を横断的に呼び出す
+ * - menu            : ラベル付きのアクションメニュー（アイコンだけのボタンを廃止）
+ * - image-*         : 画像の貼り付け（Ctrl+V）・ギャラリー・拡大表示
+ * - keyhelp         : ショートカット一覧（? キー）
+ */
+
+/* ============================================================
+   コマンドパレット（Ctrl+K）
+   1つの入口から、資産・タグ・操作すべてに到達できるようにする。
+   メニュー階層を辿って「探す」必要をなくすための仕組み。
+   ============================================================ */
+.palette-overlay {
+    position: fixed; inset: 0; z-index: var(--z-palette);
+    background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(3px);
+    display: none; align-items: flex-start; justify-content: center;
+    padding: clamp(48px, 12vh, 140px) var(--space-4) var(--space-4);
+}
+.palette-overlay.open { display: flex; }
+
+.palette {
+    width: 100%; max-width: 620px; max-height: min(560px, 76vh);
+    background: var(--surface); border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl); border: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+    animation: paletteIn var(--dur) var(--ease);
+}
+@keyframes paletteIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.985); }
+    to   { opacity: 1; transform: none; }
+}
+
+.palette-input-row {
+    display: flex; align-items: center; gap: var(--space-3);
+    padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--border);
+}
+.palette-input-row > i { color: var(--text-faint); font-size: var(--text-md); }
+.palette-input {
+    flex: 1; border: none; background: transparent; outline: none;
+    font-family: inherit; font-size: var(--text-md); color: var(--text);
+}
+.palette-input::placeholder { color: var(--text-faint); }
+
+.palette-results { flex: 1; overflow-y: auto; padding: var(--space-2); }
+.palette-group-label {
+    font-size: var(--text-2xs); font-weight: 700; color: var(--text-faint);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: var(--space-3) var(--space-3) var(--space-1);
+}
+.palette-item {
+    display: flex; align-items: center; gap: var(--space-3);
+    padding: 9px var(--space-3); border-radius: var(--radius-md); cursor: pointer;
+}
+.palette-item.active { background: var(--primary-bg); }
+.palette-item.active .palette-item-title { color: var(--primary-dark); }
+.palette-item-icon {
+    width: 28px; height: 28px; border-radius: var(--radius-md); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface-muted); color: var(--text-sub); font-size: 0.75rem;
+}
+.palette-item.active .palette-item-icon { background: var(--blue-100); color: var(--primary); }
+.palette-item-body { flex: 1; min-width: 0; }
+.palette-item-title {
+    font-size: var(--text-base); font-weight: 600; color: var(--text-strong);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.palette-item-title mark { background: var(--amber-100); color: inherit; padding: 0 1px; border-radius: 2px; }
+.palette-item-sub {
+    font-size: var(--text-xs); color: var(--text-sub);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    display: flex; align-items: center; gap: 6px;
+}
+.palette-item-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+.palette-footer {
+    display: flex; align-items: center; gap: var(--space-4);
+    padding: var(--space-2) var(--space-5); border-top: 1px solid var(--border);
+    background: var(--surface-sunken); font-size: var(--text-xs); color: var(--text-sub);
+    flex-wrap: wrap;
+}
+.palette-footer span { display: inline-flex; align-items: center; gap: 5px; }
+
+.palette-empty { padding: var(--space-8) var(--space-5); text-align: center; color: var(--text-sub); }
+.palette-empty i { font-size: 1.8rem; color: var(--slate-300); display: block; margin-bottom: var(--space-3); }
+
+/* ============================================================
+   アクションメニュー（ドロップダウン）
+   アイコンだけのボタンは意味を推測させるので、
+   使用頻度の低い操作はラベル付きのメニューにまとめる。
+   ============================================================ */
+.menu-wrap { position: relative; }
+.menu {
+    position: absolute; top: calc(100% + 6px); right: 0; min-width: 236px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg); padding: var(--space-1); z-index: var(--z-popover);
+    display: none; animation: menuIn var(--dur-fast) var(--ease);
+}
+.menu.open { display: block; }
+@keyframes menuIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+.menu-label {
+    font-size: var(--text-2xs); font-weight: 700; color: var(--text-faint);
+    letter-spacing: 0.08em; text-transform: uppercase; padding: var(--space-3) var(--space-3) var(--space-1);
+}
+.menu-item {
+    display: flex; align-items: center; gap: var(--space-3); width: 100%;
+    padding: 8px var(--space-3); border: none; background: transparent;
+    border-radius: var(--radius-md); cursor: pointer; text-align: left;
+    font-family: inherit; font-size: var(--text-base); font-weight: 500; color: var(--text);
+    transition: background var(--dur-fast) var(--ease);
+}
+.menu-item:hover { background: var(--surface-hover); }
+.menu-item i:first-child { width: 16px; text-align: center; color: var(--text-faint); font-size: 0.85rem; }
+.menu-item:hover i:first-child { color: var(--primary); }
+.menu-item-sub { font-size: var(--text-xs); color: var(--text-faint); font-weight: 400; }
+.menu-item .kbd { margin-left: auto; }
+.menu-sep { height: 1px; background: var(--border); margin: var(--space-1) 0; }
+.menu-item.is-danger { color: var(--danger); }
+.menu-item.is-danger i:first-child { color: var(--danger); }
+.menu-item.is-danger:hover { background: var(--danger-bg); }
+
+/* ============================================================
+   画像：貼り付け（Ctrl+V）とドロップ
+   ============================================================ */
+.image-dropzone {
+    background: var(--surface); padding: var(--space-8) var(--space-5);
+    border: 2px dashed var(--border-strong); border-radius: var(--radius-lg);
+    text-align: center; cursor: pointer;
+    transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.image-dropzone:hover { border-color: var(--primary); background: var(--primary-bg); }
+.image-dropzone.is-dragover {
+    border-color: var(--primary); background: var(--primary-bg);
+    box-shadow: 0 0 0 4px var(--primary-ring);
+}
+.image-dropzone-icon { font-size: 2rem; color: var(--primary); opacity: 0.6; display: block; margin-bottom: var(--space-3); }
+.image-dropzone-title { font-size: var(--text-md); font-weight: 700; color: var(--text-strong); margin-bottom: 6px; }
+.image-dropzone-methods {
+    display: flex; align-items: center; justify-content: center; gap: var(--space-3);
+    flex-wrap: wrap; margin-top: var(--space-3); font-size: var(--text-sm); color: var(--text-sub);
+}
+.image-dropzone-method { display: inline-flex; align-items: center; gap: 6px; }
+.image-dropzone-or { color: var(--text-faint); font-size: var(--text-xs); }
+
+/* 貼り付け成功時の全画面フィードバック（操作が効いたことを即座に伝える） */
+.paste-flash {
+    position: fixed; inset: 0; z-index: var(--z-toast);
+    pointer-events: none; display: flex; align-items: center; justify-content: center;
+    background: rgba(37, 89, 235, 0.10); opacity: 0;
+    animation: pasteFlash 0.5s var(--ease);
+}
+@keyframes pasteFlash {
+    0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; }
+}
+.paste-flash-badge {
+    background: var(--surface); border-radius: var(--radius-xl); padding: var(--space-5) var(--space-8);
+    box-shadow: var(--shadow-xl); display: flex; align-items: center; gap: var(--space-3);
+    font-weight: 700; color: var(--text-strong);
+}
+.paste-flash-badge i { color: var(--primary); font-size: 1.4rem; }
+
+/* 画像ギャラリー */
+.image-gallery {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--space-4);
+}
+.image-tile {
+    position: relative; border: 1px solid var(--border); border-radius: var(--radius-lg);
+    overflow: hidden; background: var(--surface);
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.image-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.image-tile.is-thumb { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-ring); }
+.image-tile-figure {
+    aspect-ratio: 4 / 3; background: var(--surface-sunken);
+    display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: zoom-in;
+}
+.image-tile-figure img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.image-tile-badge {
+    position: absolute; top: var(--space-2); left: var(--space-2); z-index: 2;
+    background: var(--primary); color: #fff; padding: 2px 8px; border-radius: var(--radius-full);
+    font-size: var(--text-2xs); font-weight: 700; display: inline-flex; align-items: center; gap: 4px;
+}
+.image-tile-caption {
+    padding: var(--space-2) var(--space-3) 0; font-size: var(--text-xs); color: var(--text-sub);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.image-tile-actions {
+    padding: 6px var(--space-2); display: flex; gap: 2px; align-items: center;
+    border-top: 1px solid var(--border-subtle); margin-top: var(--space-2);
+}
+.image-tile-actions .spacer { flex: 1; }
+
+/* 画像の拡大表示 */
+.lightbox {
+    position: fixed; inset: 0; z-index: var(--z-palette);
+    background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(6px);
+    display: none; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-4);
+    padding: var(--space-5);
+}
+.lightbox.open { display: flex; }
+.lightbox img {
+    max-width: 100%; max-height: calc(100vh - 160px); object-fit: contain;
+    border-radius: var(--radius-md); box-shadow: var(--shadow-xl); background: var(--slate-800);
+}
+.lightbox-bar {
+    display: flex; align-items: center; gap: var(--space-4); color: #fff;
+    font-size: var(--text-sm); max-width: 100%;
+}
+.lightbox-caption { opacity: 0.85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lightbox-btn {
+    width: 38px; height: 38px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(255, 255, 255, 0.14); color: #fff; font-size: var(--text-md);
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background var(--dur) var(--ease);
+}
+.lightbox-btn:hover { background: rgba(255, 255, 255, 0.28); }
+.lightbox-close { position: absolute; top: var(--space-5); right: var(--space-5); }
+
+/* ============================================================
+   未保存の変更バー
+   閉じたら消えるのではなく「未保存であること」を明示する
+   ============================================================ */
+.unsaved-flag {
+    display: none; align-items: center; gap: 6px;
+    font-size: var(--text-xs); font-weight: 600; color: var(--warning-fg);
+    background: var(--warning-bg); border: 1px solid var(--amber-200);
+    padding: 3px 10px; border-radius: var(--radius-full);
+}
+.unsaved-flag.show { display: inline-flex; }
+
+/* ============================================================
+   ショートカット一覧（? キー）
+   ============================================================ */
+.keyhelp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-5); }
+.keyhelp-group-title {
+    font-size: var(--text-2xs); font-weight: 700; color: var(--text-faint);
+    letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: var(--space-2);
+}
+.keyhelp-row {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+    padding: 7px 0; border-bottom: 1px solid var(--border-subtle); font-size: var(--text-sm);
+}
+.keyhelp-row:last-child { border-bottom: none; }
+.keyhelp-keys { display: flex; gap: 3px; flex-shrink: 0; }
+
+/* ============================================================
+   インライン・ヒント（推測させないための短い説明）
+   ============================================================ */
+.hint {
+    display: flex; align-items: flex-start; gap: var(--space-2);
+    padding: 10px var(--space-3); border-radius: var(--radius-md);
+    background: var(--info-bg); border: 1px solid var(--blue-100);
+    font-size: var(--text-sm); color: var(--info-fg); line-height: 1.55;
+}
+.hint i { margin-top: 3px; flex-shrink: 0; opacity: 0.8; }
+.hint-neutral { background: var(--surface-sunken); border-color: var(--border); color: var(--text-sub); }
+.hint-warning { background: var(--warning-bg); border-color: var(--amber-200); color: var(--warning-fg); }

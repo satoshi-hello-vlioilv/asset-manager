@@ -1394,10 +1394,8 @@ function editAssetNameInGraph(assetId, nodeElement) {
             showToast(`✓ 資産名を「${originalName}」→「${newName}」に更新しました`, 'success');
             autoSaveData();
             
-            // メイン画面のリスト表示も更新（開いている場合）
-            if(currentPage === 'assets' && window.currentAssetList) {
-                renderAssets(window.currentAssetList);
-            }
+            // メイン画面の一覧も更新（開いている場合）
+            refreshCurrentView();
         }
         
         // ノードの表示を更新（選択状態を維持）
@@ -1484,11 +1482,6 @@ function deleteAssetNodeFromGraph(assetId) {
     // 資産データを削除
     assets = assets.filter(a => a.id !== assetId);
     
-    // 表示中のリストからも削除
-    if(window.currentAssetList) {
-        window.currentAssetList = window.currentAssetList.filter(a => a.id !== assetId);
-    }
-    
     showToast(`✓ 「${asset.name}」を削除しました`, 'success');
     autoSaveData();
     
@@ -1500,11 +1493,10 @@ function deleteAssetNodeFromGraph(assetId) {
         renderAssetsListView();
     }
     
-    // メイン画面のリスト表示も更新（開いている場合）
-    if(currentPage === 'assets' && window.currentAssetList) {
-        renderAssets(window.currentAssetList);
-    }
-    
+    // メイン画面の一覧も更新
+    renderSidebar();
+    refreshCurrentView();
+
     // 選択解除
     selectedElement = null;
 }
@@ -1580,10 +1572,8 @@ function addAssetNodeToGraphAtPosition(x, y) {
         renderAssetsListView();
     }
     
-    // メイン画面のリスト表示も更新（開いている場合）
-    if(currentPage === 'assets' && window.currentAssetList) {
-        window.currentAssetList.push(newAsset);
-        renderAssets(window.currentAssetList);
-    }
+    // メイン画面の一覧も更新
+    renderSidebar();
+    refreshCurrentView();
 }
 

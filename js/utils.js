@@ -44,6 +44,81 @@ function isAncestor(ancestorId, descendantId) {
 }
 
 /**
+ * 編集中の下書き（未保存の新規資産）かどうか
+ * 新規作成中の資産は一時IDで assets に置かれるため、
+ * 一覧・件数・ダッシュボードなど「確定したデータ」を扱う場所からは除外する。
+ */
+function isDraftAsset(asset) {
+    return !!asset && String(asset.id).startsWith('temp_');
+}
+
+/**
+ * 保存済みの資産だけを返す（下書きを除く）
+ */
+function getPersistedAssets() {
+    return assets.filter(a => !isDraftAsset(a));
+}
+
+/**
+ * 今日から指定日までの日数（過去なら負の数）
+ * @param {string} dateStr - YYYY-MM-DD
+ * @returns {number}
+ */
+function daysUntil(dateStr) {
+    const target = new Date(dateStr);
+    if(isNaN(target)) return NaN;
+    target.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((target - today) / 86400000);
+}
+
+/**
+ * 日数差を「あと3日」「2日超過」のような自然な表現にする
+ * 数字だけでは方向（未来／過去）を推測させてしまうため、必ず語を添える。
+ * @param {number} days
+ */
+function formatDayDelta(days) {
+    if(isNaN(days)) return '';
+    if(days === 0) return '今日';
+    if(days === 1) return '明日';
+    if(days === -1) return '昨日';
+    return days > 0 ? `あと${days}日` : `${Math.abs(days)}日超過`;
+}
+
+/**
+ * 最新の履歴レコードを取得
+ * @returns {{date:string, event:string}|null}
+ */
+function getLatestMaintenance(asset) {
+    if(!asset.maintenance || asset.maintenance.length === 0) return null;
+    return [...asset.maintenance].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+}
+
+/**
+ * 次に到来する周期計画を取得（今日以降で最も近いもの）
+ * @returns {{date:string, event:string, cycle?:number}|null}
+ */
+function getNextSchedule(asset) {
+    if(!asset.scheduledPlans || asset.scheduledPlans.length === 0) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const future = asset.scheduledPlans
+        .filter(s => s.date && new Date(s.date) >= today)
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+    return future[0] || null;
+}
+
+/**
+ * 期限を過ぎている周期計画をすべて取得
+ * @returns {Array<{date:string, event:string, cycle?:number}>}
+ */
+function getOverdueSchedules(asset) {
+    if(!asset.scheduledPlans || asset.scheduledPlans.length === 0) return [];
+    return asset.scheduledPlans.filter(s => s.date && daysUntil(s.date) < 0);
+}
+
+/**
  * 日付を相対表記に変換
  */
 function formatDateRelative(dateStr) {
@@ -62,46 +137,46 @@ function formatDateRelative(dateStr) {
 
 /**
  * トースト通知を表示
+ * @param {string} msg
+ * @param {'success'|'warning'|'error'|'info'} [type]
+ * @param {{label:string, onClick:Function}} [action] - 取り消しなどの後続操作
  */
-function showToast(msg, type = 'success') {
+let toastTimer = null;
+
+function showToast(msg, type = 'success', action = null) {
     const t = document.getElementById('toast');
+    if(!t) return;
     const iconElement = t.querySelector('i');
     const msgElement = document.getElementById('toastMsg');
-    
-    // タイプに応じてアイコンと色を変更
-    let icon = 'fa-circle-check';
-    let color = '#4ade80';
-    let duration = 3000;
-    
-    switch(type) {
-        case 'success':
-            icon = 'fa-circle-check';
-            color = '#4ade80';
-            duration = 3000;
-            break;
-        case 'warning':
-            icon = 'fa-exclamation-triangle';
-            color = '#f59e0b';
-            duration = 4500;
-            break;
-        case 'error':
-            icon = 'fa-circle-xmark';
-            color = '#ef4444';
-            duration = 5000;
-            break;
-        case 'info':
-            icon = 'fa-info-circle';
-            color = '#3b82f6';
-            duration = 3000;
-            break;
-    }
-    
-    iconElement.className = `fa-solid ${icon}`;
-    iconElement.style.color = color;
+
+    const styles = {
+        success: { icon: 'fa-circle-check',         color: '#4ade80', duration: 3000 },
+        warning: { icon: 'fa-triangle-exclamation', color: '#fbbf24', duration: 4500 },
+        error:   { icon: 'fa-circle-xmark',         color: '#f87171', duration: 5000 },
+        info:    { icon: 'fa-circle-info',          color: '#60a5fa', duration: 3000 }
+    };
+    const style = styles[type] || styles.success;
+
+    iconElement.className = `fa-solid ${style.icon}`;
+    iconElement.style.color = style.color;
     msgElement.innerText = msg;
-    
+
+    // 既存のアクションボタンを取り除いてから、必要なら付け直す
+    t.querySelectorAll('.toast-action').forEach(btn => btn.remove());
+    if(action) {
+        const btn = document.createElement('button');
+        btn.className = 'toast-action';
+        btn.textContent = action.label;
+        btn.onclick = () => {
+            t.classList.remove('show');
+            action.onClick();
+        };
+        t.appendChild(btn);
+    }
+
+    if(toastTimer) clearTimeout(toastTimer);
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), duration);
+    toastTimer = setTimeout(() => t.classList.remove('show'), action ? style.duration + 3000 : style.duration);
 }
 
 /**
@@ -117,14 +192,37 @@ function autoSaveData() {
         clearTimeout(autoSaveTimer);
     }
     
+    setAutoSaveIndicator('saving');
+
     // 新しいタイマーをセット
     autoSaveTimer = setTimeout(async () => {
         const success = await saveDataToDB();
-        if(success) {
-            console.log('データを自動保存しました (IndexedDB)');
-        }
+        setAutoSaveIndicator(success ? 'saved' : 'error');
         autoSaveTimer = null;
     }, AUTO_SAVE_DELAY);
+}
+
+/**
+ * 自動保存の状態をサイドバー下部に表示する
+ * 「保存したはずだが本当に保存されたか」を確かめる操作を不要にするため、
+ * 状態を静かに、しかし常に見える場所に出しておく。
+ * @param {'saving'|'saved'|'error'} state
+ */
+function setAutoSaveIndicator(state) {
+    const el = document.getElementById('autoSaveIndicator');
+    if(!el) return;
+
+    if(state === 'saving') {
+        el.innerHTML = '<i class="fa-solid fa-arrows-rotate fa-spin"></i> 保存中';
+        el.style.color = 'var(--text-faint)';
+    } else if(state === 'saved') {
+        const time = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        el.innerHTML = `<i class="fa-solid fa-check"></i> ${time} 保存済`;
+        el.style.color = 'var(--success)';
+    } else {
+        el.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> 保存に失敗';
+        el.style.color = 'var(--danger)';
+    }
 }
 
 /**

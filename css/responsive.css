@@ -10,7 +10,12 @@
 /* サイドバー用オーバーレイ（モバイル時のみ有効） */
 .sidebar-overlay {
     position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45);
-    z-index: 25; display: none;
+    z-index: var(--z-overlay); display: none;
+}
+
+/* 画面が狭いときは補助的な要素から順に隠す（重要度の低い順） */
+@media (max-width: 1180px) {
+    .hide-lg { display: none !important; }
 }
 
 @media (max-width: 900px) {
@@ -18,28 +23,28 @@
     .sidebar {
         position: fixed; top: 0; left: 0; bottom: 0;
         transform: translateX(-100%);
-        transition: transform 0.25s ease;
-        box-shadow: var(--shadow-lg);
-        z-index: 30;
+        transition: transform var(--dur-slow) var(--ease);
+        box-shadow: var(--shadow-xl);
+        z-index: var(--z-drawer);
     }
     body.sidebar-open .sidebar { transform: translateX(0); }
     body.sidebar-open .sidebar-overlay { display: block; }
     .sidebar-toggle { display: inline-flex; flex-shrink: 0; }
 
-    .header { padding: 0 12px; gap: 4px; }
-    .content-scroll { padding: 16px; }
+    .header { padding: 0 var(--space-3); gap: var(--space-2); }
+    .context-bar { padding: var(--space-2) var(--space-3); }
+    .content-scroll { padding: var(--space-4) var(--space-3); }
 
-    /* 検索バーは縮小可能に */
-    #searchContainer { width: auto !important; min-width: 110px; }
+    .search-container { max-width: none; }
+    .hide-md { display: none !important; }
 
     /* モーダルは全画面表示 */
-    .modal-large, .modal-mid, .modal-full {
-        width: 100%; max-width: 100%;
-        height: 100%; max-height: 100%;
-        border-radius: 0;
+    .modal-overlay { padding: 0; }
+    .modal-large, .modal-mid, .modal-wide, .modal-full {
+        width: 100%; max-width: 100%; height: 100%; max-height: 100%; border-radius: 0;
     }
-    .tabs { overflow-x: auto; padding: 0 8px; }
-    .tab { padding: 12px; white-space: nowrap; }
+    .tabs { padding: 0 var(--space-2); }
+    .tab { padding: 11px 10px; }
 
     /* マスタエディタ */
     .editor-sidebar { width: 200px; }
@@ -50,24 +55,56 @@
     }
 
     /* カレンダーのセルを縮小 */
-    .calendar-day-cell { min-height: 72px; padding: 4px; }
+    .calendar-day-cell { min-height: 76px; padding: 4px; }
+
+    .palette-overlay { padding: var(--space-4); align-items: flex-start; }
 }
 
 @media (max-width: 640px) {
-    /* ヘッダーを折返し可能にしてツールボタンを2段に */
+    /* 狭い画面ではヘッダーを2段に分ける
+       1段目 = 現在地（タイトル）と主要動線 / 2段目 = 絞り込みと表示切替 */
     .header {
-        flex-wrap: wrap; height: auto; min-height: var(--header-height);
-        padding: 8px 12px; row-gap: 8px;
+        height: auto; min-height: var(--header-height);
+        padding: var(--space-2) var(--space-3);
+        flex-wrap: wrap; row-gap: var(--space-2);
     }
+    /* 1段目: 現在地 + 主要動線 / 2段目: 検索と表示切替 */
+    .header-left  { flex: 1 1 auto; min-width: 0; }
+    .header-right { flex: 0 0 auto; margin-left: auto; }
+    .header-tools { order: 3; flex: 1 1 100%; margin-left: 0; }
+    .search-container { flex: 1 1 120px; max-width: none; }
+    .page-title { font-size: var(--text-md); }
+    .hide-sm { display: none !important; }
+    .segmented { flex-shrink: 0; }
+
+    /* 列設定は「その他の操作」メニューからも開けるので、狭い画面では隠す */
+    #btnListSettings { display: none !important; }
 
     /* ダッシュボード統計カードを2列に */
-    .dashboard-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-    .stat-card-value, .stat-value { font-size: 1.5rem; }
+    .dashboard-grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
+    .stat-card { padding: var(--space-3) var(--space-4); }
+    .stat-card-value, .stat-value { font-size: var(--text-xl); }
 
     /* モーダル内の2カラムグリッドを1カラムに */
-    #tabBasic > div, #dynamicInputContainer { grid-template-columns: 1fr !important; }
+    .form-grid, #dynamicInputContainer { grid-template-columns: 1fr !important; }
 
-    .modal-header { padding: 12px 16px; }
-    .modal-footer { padding: 12px 16px; }
-    .tab-content-area { padding: 16px; }
+    .modal-header { padding: var(--space-3) var(--space-4); }
+    .modal-footer { padding: var(--space-3) var(--space-4); gap: var(--space-2); }
+    .modal-footer-hint { display: none; }
+    .tab-content-area { padding: var(--space-4) var(--space-3); }
+    .form-card { padding: var(--space-4); }
+
+    .asset-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-3); }
+    .image-gallery { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-3); }
+
+    .timeline-date { width: 74px; }
+    .toast { left: var(--space-3); right: var(--space-3); transform: translateY(24px); max-width: none; }
+    .toast.show { transform: translateY(0); }
+}
+
+/* 印刷（一覧を紙で確認する運用が多いため最低限の整形） */
+@media print {
+    .sidebar, .header, .context-bar, .toast, .palette-overlay, .menu { display: none !important; }
+    body, .main, .content-scroll { height: auto; overflow: visible; background: #fff; }
+    .card, .list-table-wrap, .panel { break-inside: avoid; box-shadow: none; }
 }

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="タグ・マスタ定義・カスタムフィールドに対応した統合資産管理システム">
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="#2559eb">
     <title>統合資産管理システム - Professional Edition</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/patterns.css">
     <link rel="stylesheet" href="css/modal.css">
     <link rel="stylesheet" href="css/master-editor.css">
     <link rel="stylesheet" href="css/responsive.css">
@@ -27,378 +28,492 @@
 <body>
 
 <div class="app-container">
-    <!-- SIDEBAR -->
+    <!-- =============================================
+         SIDEBAR — 「どこを見るか」
+         ============================================= -->
     <aside class="sidebar">
         <div class="sidebar-header">
-            <i class="fa-solid fa-cube fa-lg"></i> AssetManager Pro
-            <span id="appVersionBadge" class="badge badge-gray" style="margin-left:auto; font-weight:600;" title="アプリケーションバージョン"></span>
+            <span class="sidebar-logo"><i class="fa-solid fa-cube"></i></span>
+            <span>AssetManager</span>
+            <span id="appVersionBadge" class="count-pill" style="margin-left:auto;" title="アプリケーションバージョン"></span>
         </div>
-        <div class="sidebar-content" id="sidebarNav">
+        <nav class="sidebar-content" id="sidebarNav" aria-label="メインナビゲーション">
             <!-- Dynamic Menu -->
+        </nav>
+        <div class="sidebar-footer">
+            <div class="nav-item" onclick="openMasterModal()" title="タグ階層とカスタムフィールドを編集します">
+                <i class="fa-solid fa-sitemap"></i>
+                <span class="nav-item-text">マスタ・タグ設定</span>
+            </div>
+            <div class="menu-wrap">
+                <div class="nav-item" onclick="toggleMenu('dataMenu', event)" aria-haspopup="true">
+                    <i class="fa-solid fa-database"></i>
+                    <span class="nav-item-text">データ管理</span>
+                    <i class="fa-solid fa-chevron-up" style="font-size:0.6rem; width:auto;"></i>
+                </div>
+                <div class="menu" id="dataMenu" style="bottom:calc(100% + 6px); top:auto; left:0; right:0;">
+                    <div class="menu-label">バックアップ</div>
+                    <button class="menu-item" onclick="closeMenus(); exportToJSON();">
+                        <i class="fa-solid fa-file-arrow-down"></i>
+                        <span>JSONに書き出す<span class="menu-item-sub" style="display:block;">全資産・タグ・マスタ定義</span></span>
+                    </button>
+                    <button class="menu-item" onclick="closeMenus(); document.getElementById('importFile').click();">
+                        <i class="fa-solid fa-file-arrow-up"></i>
+                        <span>JSONから読み込む<span class="menu-item-sub" style="display:block;">画面にドロップしても可</span></span>
+                    </button>
+                    <div class="menu-sep"></div>
+                    <button class="menu-item is-danger" onclick="closeMenus(); clearDatabase();">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span>すべてのデータを消去</span>
+                    </button>
+                </div>
+            </div>
+            <div class="sidebar-footer-row">
+                <span title="データはこのブラウザのIndexedDBに自動保存されます">自動保存</span>
+                <span id="autoSaveIndicator" title="最終保存時刻"></span>
+            </div>
         </div>
     </aside>
 
     <!-- モバイル表示時のサイドバー用オーバーレイ -->
     <div class="sidebar-overlay" onclick="toggleSidebar(false)" aria-hidden="true"></div>
 
-    <!-- MAIN CONTENT -->
+    <!-- =============================================
+         MAIN — 「何をするか」
+         ============================================= -->
     <main class="main">
         <header class="header">
-            <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+            <div class="header-left">
                 <button class="btn btn-ghost btn-icon-only sidebar-toggle" onclick="toggleSidebar()" title="メニュー" aria-label="サイドバーを開閉">
                     <i class="fa-solid fa-bars"></i>
                 </button>
-                <h2 id="pageTitle" style="margin:0; font-size:1.1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">ダッシュボード</h2>
+                <h1 id="pageTitle" class="page-title">ダッシュボード</h1>
             </div>
-            
-            <div style="display:flex; gap:8px; align-items:center; margin-left:auto;">
-                <!-- リスト表示設定（一番左、固定位置） -->
-                <button class="btn btn-outline btn-sm" onclick="openListSettingsModal()" id="btnListSettings" style="display:none;" title="リスト表示設定">
-                    <i class="fa-solid fa-sliders"></i> 表示設定
-                </button>
-                
-                <!-- View Toggle (assets page only) -->
-                <div id="viewToggle" style="display:none; background:#f1f5f9; padding:4px; border-radius:var(--radius-md); gap:4px;">
-                    <button class="btn btn-sm" id="btnViewList" style="padding:6px 12px;" onclick="switchAssetView('list')">
-                        <i class="fa-solid fa-list"></i>
-                    </button>
-                    <button class="btn btn-sm btn-ghost" id="btnViewCard" style="padding:6px 12px;" onclick="switchAssetView('card')">
-                        <i class="fa-solid fa-grip"></i>
-                    </button>
-                    <button class="btn btn-sm btn-ghost" id="btnViewCalendar" style="padding:6px 12px;" onclick="switchAssetView('calendar')">
-                        <i class="fa-solid fa-calendar"></i>
-                    </button>
-                </div>
-                
-                <!-- Search Bar（固定幅） -->
-                <div class="search-container" id="searchContainer" style="display:none; width:280px;">
+
+            <!-- 絞り込み・表示に関する道具（狭い画面では2段目に回り込む） -->
+            <div class="header-tools">
+                <!-- 検索（資産一覧でのみ表示） -->
+                <div class="search-container" id="searchContainer" style="display:none;">
                     <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                    <input type="text" class="search-input" id="searchInput" placeholder="資産名、タグ、IDで検索… (Ctrl+K)" aria-label="資産を検索" oninput="handleSearch(this.value)">
+                    <input type="text" class="search-input" id="searchInput"
+                           placeholder="この一覧の中を絞り込む…" aria-label="表示中の資産を絞り込む"
+                           oninput="handleSearch(this.value)">
+                    <span class="search-hint hide-md"><span class="kbd">/</span></span>
+                    <button class="search-clear" onclick="clearSearchInput()" title="検索をクリア" aria-label="検索をクリア">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
                 </div>
 
-                <div style="width:1px; height:24px; background:var(--border);" id="divider1"></div>
+                <!-- 全体検索（コマンドパレット） -->
+                <button class="btn btn-outline btn-sm" onclick="openPalette()" title="資産・タグ・操作を横断検索">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <span class="hide-sm">検索</span>
+                    <span class="kbd hide-md">Ctrl K</span>
+                </button>
 
-                <!-- Actions -->
-                <button class="btn btn-outline btn-sm" onclick="openMasterModal()" title="マスタ設定・タグ管理" aria-label="マスタ設定・タグ管理">
-                    <i class="fa-solid fa-sliders"></i>
+                <!-- 表示切替（資産一覧でのみ表示） -->
+                <div class="segmented" id="viewToggle" style="display:none;" role="group" aria-label="表示形式">
+                    <button class="btn btn-sm" id="btnViewList" onclick="switchAssetView('list')" title="リスト表示：項目を比較したいとき">
+                        <i class="fa-solid fa-list"></i><span class="hide-lg">リスト</span>
+                    </button>
+                    <button class="btn btn-sm btn-ghost" id="btnViewCard" onclick="switchAssetView('card')" title="カード表示：見た目で探したいとき">
+                        <i class="fa-solid fa-grip"></i><span class="hide-lg">カード</span>
+                    </button>
+                    <button class="btn btn-sm btn-ghost" id="btnViewCalendar" onclick="switchAssetView('calendar')" title="カレンダー表示：予定を確認したいとき">
+                        <i class="fa-solid fa-calendar"></i><span class="hide-lg">カレンダー</span>
+                    </button>
+                </div>
+
+                <!-- リスト表示設定（リスト表示のときだけ現れる） -->
+                <button class="btn btn-outline btn-sm" onclick="openListSettingsModal()" id="btnListSettings" style="display:none;" title="表示する列と並び順を変更">
+                    <i class="fa-solid fa-table-columns"></i><span class="hide-md">列</span>
                 </button>
-                <button class="btn btn-outline btn-sm" onclick="exportToJSON()" title="エクスポート" aria-label="データをエクスポート">
-                    <i class="fa-solid fa-download"></i>
-                </button>
-                <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()" title="インポート" aria-label="データをインポート">
-                    <i class="fa-solid fa-upload"></i>
-                </button>
+            </div>
+
+            <div class="header-right">
+                <div class="header-divider hide-sm" id="divider1"></div>
+
+                <!-- その他の操作（ラベル付きメニューに集約） -->
+                <div class="menu-wrap">
+                    <button class="btn btn-ghost btn-icon-only" onclick="toggleMenu('moreMenu', event)"
+                            title="その他の操作" aria-label="その他の操作" aria-haspopup="true">
+                        <i class="fa-solid fa-ellipsis-vertical"></i>
+                    </button>
+                    <div class="menu" id="moreMenu">
+                        <div class="menu-label">設定</div>
+                        <button class="menu-item" onclick="closeMenus(); openMasterModal();">
+                            <i class="fa-solid fa-sitemap"></i><span>マスタ・タグ設定</span>
+                        </button>
+                        <button class="menu-item" onclick="closeMenus(); openListSettingsModal();">
+                            <i class="fa-solid fa-table-columns"></i><span>リストの列を設定</span>
+                        </button>
+                        <div class="menu-sep"></div>
+                        <div class="menu-label">データ</div>
+                        <button class="menu-item" onclick="closeMenus(); exportToJSON();">
+                            <i class="fa-solid fa-file-arrow-down"></i><span>JSONに書き出す</span>
+                        </button>
+                        <button class="menu-item" onclick="closeMenus(); document.getElementById('importFile').click();">
+                            <i class="fa-solid fa-file-arrow-up"></i><span>JSONから読み込む</span>
+                        </button>
+                        <div class="menu-sep"></div>
+                        <button class="menu-item" onclick="closeMenus(); openKeyHelp();">
+                            <i class="fa-solid fa-keyboard"></i><span>ショートカット一覧</span><span class="kbd">?</span>
+                        </button>
+                    </div>
+                </div>
                 <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importFromJSON(event)">
-                
-                <button class="btn btn-primary btn-sm" onclick="createNewAsset()" id="btnCreateAsset">
-                    <i class="fa-solid fa-plus"></i> 新規資産
+
+                <!-- 主要動線：1画面に1つだけの primary -->
+                <button class="btn btn-primary btn-sm" onclick="createNewAsset()" id="btnCreateAsset" title="新しい資産を登録します">
+                    <i class="fa-solid fa-plus"></i> <span class="hide-sm">新規資産</span>
+                    <span class="kbd hide-md" style="background:rgba(255,255,255,0.18); border-color:rgba(255,255,255,0.3); color:#fff;">N</span>
                 </button>
             </div>
         </header>
 
+        <!-- =============================================
+             CONTEXT BAR — 「今どういう状態か」
+             適用中の絞り込みと件数を常時提示する
+             ============================================= -->
+        <div class="context-bar" id="contextBar">
+            <span class="context-count" id="contextCount"></span>
+            <div id="contextChips" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;"></div>
+            <button class="btn btn-ghost btn-sm" id="contextClear" onclick="clearAllFilters()" style="display:none;">
+                <i class="fa-solid fa-rotate-left"></i> 条件をすべて解除
+            </button>
+        </div>
+
         <div class="content-scroll">
-            <!-- Dashboard Content -->
-            <div id="dashboardContainer" style="display:none;">
-                <!-- Dashboard will be rendered here -->
-            </div>
-            
-            <!-- Asset List/Card Content -->
-            <div id="assetContainer">
-                <!-- Assets will be rendered here (list or card view) -->
+            <div class="content-inner">
+                <!-- Dashboard Content -->
+                <div id="dashboardContainer" style="display:none;"></div>
+
+                <!-- Asset List/Card/Calendar Content -->
+                <div id="assetContainer"></div>
             </div>
         </div>
-            </main></div>
-        
-    
+    </main>
+</div>
 
+<!-- =============================================
+     COMMAND PALETTE (Ctrl+K)
+     資産・タグ・操作をひとつの入口から呼び出す
+     ============================================= -->
+<div class="palette-overlay" id="paletteOverlay" onclick="if(event.target===this) closePalette()">
+    <div class="palette" role="dialog" aria-modal="true" aria-label="コマンドパレット">
+        <div class="palette-input-row">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" class="palette-input" id="paletteInput"
+                   placeholder="資産名・タグ・操作を入力…" autocomplete="off" spellcheck="false">
+            <span class="kbd">Esc</span>
+        </div>
+        <div class="palette-results" id="paletteResults"></div>
+        <div class="palette-footer">
+            <span><span class="kbd">↑</span><span class="kbd">↓</span> 移動</span>
+            <span><span class="kbd">Enter</span> 開く</span>
+            <span><span class="kbd">Esc</span> 閉じる</span>
+        </div>
+    </div>
+</div>
 
 <!-- =============================================
      ASSET DETAIL MODAL
      ============================================= -->
 <div class="modal-overlay" id="assetModal">
-    <div class="modal-large">
+    <div class="modal-large" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-header">
-            <div>
-                <span id="modalStatusBadge" class="badge badge-green" style="margin-bottom:4px;">稼働中</span>
-                <h3 id="modalTitle" style="margin:0; font-size:1.4rem;">資産詳細</h3>
-                <span id="modalAssetId" style="font-size:0.8rem; color:var(--text-sub);">ID: 12345</span>
+            <div class="modal-title-block">
+                <div class="modal-title-row">
+                    <span id="modalStatusBadge" class="badge badge-green">稼働中</span>
+                    <span class="unsaved-flag" id="assetUnsavedFlag">
+                        <i class="fa-solid fa-circle" style="font-size:0.4rem;"></i> 未保存の変更があります
+                    </span>
+                </div>
+                <h3 id="modalTitle">資産詳細</h3>
+                <div class="modal-meta-row">
+                    <span id="modalAssetId" class="mono">ID: 12345</span>
+                    <span id="modalAssetMeta"></span>
+                </div>
             </div>
-            <button class="btn btn-icon-only btn-ghost" onclick="closeModal('assetModal')"><i class="fa-solid fa-xmark fa-lg"></i></button>
+            <div class="modal-header-actions">
+                <button class="btn btn-ghost btn-icon-only" onclick="closeModal('assetModal')" title="閉じる (Esc)" aria-label="閉じる">
+                    <i class="fa-solid fa-xmark fa-lg"></i>
+                </button>
+            </div>
         </div>
-        
-        <div class="tabs">
-            <div class="tab active" onclick="switchTab(this, 'tabBasic')">基本情報</div>
-            <div class="tab" onclick="switchTab(this, 'tabImages')">画像</div>
-            <div class="tab" onclick="switchTab(this, 'tabComponents')">構成パーツ</div>
-            <div class="tab" onclick="switchTab(this, 'tabOps')">運用基準・手順</div>
-            <div class="tab" onclick="switchTab(this, 'tabRisk')">リスク管理・安全</div>
-            <div class="tab" onclick="switchTab(this, 'tabSchedule')">周期計画</div>
-            <div class="tab" onclick="switchTab(this, 'tabMaint')">履歴</div>
+
+        <div class="tabs" role="tablist">
+            <div class="tab active" onclick="switchTab(this, 'tabBasic')" role="tab">基本情報</div>
+            <div class="tab" onclick="switchTab(this, 'tabImages')" role="tab">
+                画像 <span class="count-pill" id="tabCountImages">0</span>
+            </div>
+            <div class="tab" onclick="switchTab(this, 'tabComponents')" role="tab">
+                構成パーツ <span class="count-pill" id="tabCountComponents">0</span>
+            </div>
+            <div class="tab" onclick="switchTab(this, 'tabOps')" role="tab">運用基準・手順</div>
+            <div class="tab" onclick="switchTab(this, 'tabRisk')" role="tab">リスク管理・安全</div>
+            <div class="tab" onclick="switchTab(this, 'tabSchedule')" role="tab">
+                周期計画 <span class="count-pill" id="tabCountSchedule">0</span>
+            </div>
+            <div class="tab" onclick="switchTab(this, 'tabMaint')" role="tab">
+                履歴 <span class="count-pill" id="tabCountMaint">0</span>
+            </div>
         </div>
 
         <div class="modal-body tab-content-area">
-            <!-- Tab 1: Basic Info -->
+            <!-- Tab 1: 基本情報 -->
             <div id="tabBasic" class="tab-pane active">
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px;">
-                    <div>
-                        <label style="font-size:0.85rem; font-weight:700; color:var(--text-sub); display:block; margin-bottom:6px;">資産名称</label>
-                        <input type="text" id="editAssetName" class="input" placeholder="資産名称を入力">
-                    </div>
-                    <div>
-                        <label style="font-size:0.85rem; font-weight:700; color:var(--text-sub); display:block; margin-bottom:6px;">設置/導入日</label>
-                        <input type="date" id="editAssetDate" class="input">
-                    </div>
-                    
-                    <div style="grid-column: 1 / -1;">
-                        <label style="font-size:0.85rem; font-weight:700; color:var(--text-sub); display:block; margin-bottom:6px;">稼働状況 (システムステータス)</label>
-                        <!-- ステータス候補は js/config.js の STATUS_DEFS から動的に生成 -->
-                        <div id="statusCheckboxContainer" style="display:flex; gap:16px; flex-wrap:wrap; padding:12px; background:#f8fafc; border-radius:var(--radius-md); border:1px solid var(--border);">
-                        </div>
-                    </div>
+                <div class="tab-stack">
+                    <div class="form-card">
+                        <div class="form-grid">
+                            <div class="field">
+                                <label class="field-label" for="editAssetName">資産名称</label>
+                                <input type="text" id="editAssetName" class="input" placeholder="例: フォークリフト No.101">
+                            </div>
+                            <div class="field">
+                                <label class="field-label" for="editAssetDate">設置 / 導入日</label>
+                                <input type="date" id="editAssetDate" class="input">
+                            </div>
 
-                    <div style="grid-column: 1 / -1;">
-                        <label style="font-size:0.85rem; font-weight:700; color:var(--text-sub); display:block; margin-bottom:6px;">
-                            親資産（所属する上位資産）
-                            <span style="font-weight:400; color:var(--text-sub); font-size:0.8rem; margin-left:8px;">
-                                <i class="fa-solid fa-info-circle"></i> 
-                                この資産が別の資産の一部である場合に選択します
-                            </span>
-                        </label>
-                        <div id="parentAssetSelectContainer">
-                            <!-- 親資産選択セレクトボックスがJavaScriptで描画される -->
-                        </div>
-                    </div>
+                            <div class="field span-2">
+                                <span class="field-label">稼働状況</span>
+                                <!-- ステータス候補は js/config.js の STATUS_DEFS から動的に生成 -->
+                                <div id="statusCheckboxContainer" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+                            </div>
 
-                    <div id="dynamicInputContainer" style="grid-column: 1 / -1; display:grid; grid-template-columns: 1fr 1fr; gap:24px;">
+                            <div id="dynamicInputContainer" class="span-2" style="display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4) var(--space-5);"></div>
+
+                            <div class="field span-2">
+                                <label class="field-label" for="editAssetSpecs">備考</label>
+                                <textarea id="editAssetSpecs" class="input" placeholder="補足情報や特記事項を入力"></textarea>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- カスタムフィールドコンテナ -->
-                    <div id="customFieldsContainer" style="grid-column: 1 / -1; display:none;">
-                    </div>
+                    <div id="customFieldsContainer" style="display:none;"></div>
 
-                    <div style="grid-column: 1 / -1;">
-                        <label style="font-size:0.85rem; font-weight:700; color:var(--text-sub); display:block; margin-bottom:6px;">備考</label>
-                        <textarea id="editAssetSpecs" class="input" placeholder="補足情報や特記事項を入力"></textarea>
+                    <div class="form-card">
+                        <div class="section-head">
+                            <div>
+                                <h4 class="section-title"><i class="fa-solid fa-sitemap"></i> 所属先（親資産）</h4>
+                                <p class="section-desc">この資産が別の資産の一部である場合に設定します</p>
+                            </div>
+                        </div>
+                        <div id="parentAssetSelectContainer"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab 2: Images -->
+            <!-- Tab 2: 画像 -->
             <div id="tabImages" class="tab-pane">
-                <div style="display:grid; gap:24px;">
-                    <!-- 画像ドラッグアンドドロップエリア -->
-                    <div id="imageDropZone" style="background:#fff; padding:40px 20px; border:2px dashed var(--border); border-radius:var(--radius-md); text-align:center; cursor:pointer; transition:all 0.2s;">
-                        <input type="file" id="imageFileInput" accept="image/*" multiple="" style="display:none;" onchange="handleImageFiles(this.files)">
-                        <i class="fa-solid fa-cloud-arrow-up" style="font-size:3rem; color:var(--primary); margin-bottom:12px; display:block; opacity:0.5;"></i>
-                        <h4 style="margin:0 0 8px 0; color:var(--text);">画像をドラッグ&amp;ドロップ</h4>
-                        <p style="margin:0; color:var(--text-sub); font-size:0.9rem;">または <span style="color:var(--primary); font-weight:600; text-decoration:underline;">クリックして選択</span></p>
-                        <p style="margin:8px 0 0 0; color:var(--text-sub); font-size:0.85rem; opacity:0.7;">対応形式: JPEG, PNG, GIF, WebP など</p>
+                <div class="tab-stack">
+                    <!-- 画像の登録：貼り付け・ドロップ・ファイル選択の3経路を同じ場所に置く -->
+                    <div class="image-dropzone" id="imageDropZone" tabindex="0" role="button"
+                         aria-label="画像を追加：Ctrl+Vで貼り付け、ドロップ、またはクリックして選択">
+                        <input type="file" id="imageFileInput" accept="image/*" multiple style="display:none;"
+                               onchange="handleImageFiles(this.files); this.value='';">
+                        <i class="fa-solid fa-image image-dropzone-icon"></i>
+                        <div class="image-dropzone-title">画像を追加</div>
+                        <div class="image-dropzone-methods">
+                            <span class="image-dropzone-method">
+                                <span class="kbd">Ctrl</span><span class="kbd">V</span> で貼り付け
+                            </span>
+                            <span class="image-dropzone-or">/</span>
+                            <span class="image-dropzone-method"><i class="fa-solid fa-arrow-down-to-line"></i> ドラッグ&amp;ドロップ</span>
+                            <span class="image-dropzone-or">/</span>
+                            <span class="image-dropzone-method"><i class="fa-solid fa-folder-open"></i> クリックして選択</span>
+                        </div>
+                        <div class="field-hint" style="margin-top:10px;">
+                            スクリーンショット（Windows: <span class="kbd">Win</span><span class="kbd">Shift</span><span class="kbd">S</span> /
+                            Mac: <span class="kbd">⌘</span><span class="kbd">Ctrl</span><span class="kbd">Shift</span><span class="kbd">4</span>）を撮って、
+                            この画面でそのまま貼り付けられます
+                        </div>
                     </div>
-                    
-                    <!-- 画像URL入力エリア（代替手段） -->
-                    <div style="background:#f8fafc; padding:20px; border:1px solid var(--border); border-radius:var(--radius-md);">
-                        <h4 style="margin:0 0 16px 0; display:flex; align-items:center; gap:8px; font-size:0.95rem;">
-                            <i class="fa-solid fa-link" style="color:var(--text-sub);"></i> URLから追加（代替手段）
-                        </h4>
-                        <div style="display:grid; grid-template-columns: 1fr auto; gap:12px; align-items:end;">
+
+                    <!-- 登録済み画像 -->
+                    <div class="form-card">
+                        <div class="section-head">
                             <div>
-                                <label style="font-size:0.85rem; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">画像URL</label>
-                                <input type="text" id="newImageUrl" class="input" placeholder="画像のURLを入力 (例: https://...)">
+                                <h4 class="section-title"><i class="fa-solid fa-images"></i> 登録済み画像</h4>
+                                <p class="section-desc">クリックで拡大。「代表にする」を押した画像が一覧のサムネイルになります（画像の追加・削除はすぐに保存されます）</p>
                             </div>
-                            <button class="btn btn-outline" onclick="addImageFromUrl()" style="white-space:nowrap; height:42px;">
-                                <i class="fa-solid fa-plus"></i> 追加
+                            <button class="btn btn-ghost btn-sm" onclick="toggleImageUrlForm()" id="btnToggleImageUrl">
+                                <i class="fa-solid fa-link"></i> URLから追加
                             </button>
                         </div>
-                        <div style="margin-top:12px;">
-                            <label style="font-size:0.85rem; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">コメント（オプション）</label>
-                            <input type="text" id="newImageComment" class="input" placeholder="画像の説明やメモ">
-                        </div>
-                    </div>
 
-                    <!-- 登録済み画像一覧 -->
-                    <div style="background:#fff; padding:20px; border:1px solid var(--border); border-radius:var(--radius-md);">
-                        <h4 style="margin:0 0 16px 0; display:flex; align-items:center; gap:8px;">
-                            <i class="fa-solid fa-images" style="color:var(--primary);"></i> 登録済み画像
-                            <span style="font-size:0.85rem; font-weight:normal; color:var(--text-sub);">（選択した画像がカード表示のサムネイルになります）</span>
-                        </h4>
-                        <div id="imagesGalleryContainer">
-                            <!-- JavaScript で描画 -->
+                        <!-- URL入力（代替手段なので普段は畳んでおく） -->
+                        <div id="imageUrlForm" style="display:none; margin-bottom:var(--space-4);">
+                            <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:var(--space-3); align-items:end;">
+                                <div class="field">
+                                    <label class="field-label" for="newImageUrl">画像URL</label>
+                                    <input type="text" id="newImageUrl" class="input" placeholder="https://…">
+                                </div>
+                                <div class="field">
+                                    <label class="field-label" for="newImageComment">説明（任意）</label>
+                                    <input type="text" id="newImageComment" class="input" placeholder="画像の説明やメモ">
+                                </div>
+                                <button class="btn btn-outline" onclick="addImageFromUrl()" style="height:38px;">
+                                    <i class="fa-solid fa-plus"></i> 追加
+                                </button>
+                            </div>
                         </div>
+
+                        <div id="imagesGalleryContainer"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab 3: Components (Child Assets) -->
+            <!-- Tab 3: 構成パーツ -->
             <div id="tabComponents" class="tab-pane">
-                <div style="display:grid; gap:24px;">
-                    <div style="background:#f8fafc; padding:20px; border:1px solid var(--border); border-radius:var(--radius-md);">
-                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-                            <h4 style="margin:0; display:flex; align-items:center; gap:8px;">
-                                <i class="fa-solid fa-diagram-project" style="color:var(--primary);"></i> 
-                                構成パーツ（子資産）
-                            </h4>
-                            <span style="font-size:0.85rem; color:var(--text-sub);">
-                                この資産を親として登録されている資産の一覧
-                            </span>
+                <div class="tab-stack">
+                    <div class="form-card">
+                        <div class="section-head">
+                            <div>
+                                <h4 class="section-title"><i class="fa-solid fa-diagram-project"></i> 構成パーツ（子資産）</h4>
+                                <p class="section-desc">この資産を親として登録されている資産の一覧</p>
+                            </div>
+                            <button class="btn btn-outline btn-sm" onclick="openAssetStructureModal()">
+                                <i class="fa-solid fa-pen"></i> 構成を編集
+                            </button>
                         </div>
-                        <div id="componentsListContainer">
-                            <!-- JavaScript で描画 -->
-                        </div>
+                        <div id="componentsListContainer"></div>
                     </div>
-                    
-                    <!-- 親資産の表示 -->
-                    <div style="background:#fff; padding:20px; border:1px solid var(--border); border-radius:var(--radius-md);">
-                        <h4 style="margin:0 0 12px 0; display:flex; align-items:center; gap:8px;">
-                            <i class="fa-solid fa-arrow-up" style="color:var(--text-sub);"></i> 
-                            所属先（親資産）
+
+                    <div class="form-card">
+                        <h4 class="section-title" style="margin-bottom:var(--space-3);">
+                            <i class="fa-solid fa-arrow-turn-up"></i> 所属先（親資産）
                         </h4>
-                        <div id="parentAssetInfoContainer">
-                            <!-- JavaScript で描画 -->
-                        </div>
+                        <div id="parentAssetInfoContainer"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab 4: Operations -->
+            <!-- Tab 4: 運用基準・手順 -->
             <div id="tabOps" class="tab-pane">
-                <div style="display:grid; gap:24px;">
-                    <div style="background:#fff; padding:20px; border:1px solid var(--border); border-radius:var(--radius-md);">
-                        <h4 style="margin:0 0 12px 0; display:flex; align-items:center; gap:8px;">
+                <div class="tab-stack">
+                    <div class="form-card">
+                        <h4 class="section-title" style="margin-bottom:var(--space-3);">
                             <i class="fa-solid fa-book-open" style="color:var(--primary);"></i> 標準操作手順
                         </h4>
-                        <textarea id="editOperationsProcedure" class="input" rows="6" placeholder="始業時の操作手順、終業時の手順、通常運転時の手順など"></textarea>
+                        <textarea id="editOperationsProcedure" class="input" rows="6"
+                                  placeholder="始業時の操作手順、終業時の手順、通常運転時の手順など"></textarea>
                     </div>
-                    
-                    <div style="background:#fff; padding:20px; border:1px solid var(--border); border-radius:var(--radius-md);">
-                        <h4 style="margin:0 0 12px 0; display:flex; align-items:center; gap:8px;">
+
+                    <div class="form-card">
+                        <h4 class="section-title" style="margin-bottom:var(--space-3);">
                             <i class="fa-solid fa-list-check" style="color:var(--success);"></i> 点検チェックポイント
                         </h4>
-                        <textarea id="editOperationsCheckpoints" class="input" rows="6" placeholder="始業前点検項目、定期点検項目、異常時の確認事項など"></textarea>
+                        <textarea id="editOperationsCheckpoints" class="input" rows="6"
+                                  placeholder="始業前点検項目、定期点検項目、異常時の確認事項など"></textarea>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab 3: Risk Management -->
+            <!-- Tab 5: リスク管理・安全 -->
             <div id="tabRisk" class="tab-pane">
-                <div style="display:grid; gap:24px;">
-                    <div style="background:#fff; padding:20px; border:1px solid var(--border); border-radius:var(--radius-md);">
-                        <h4 style="margin:0 0 12px 0; display:flex; align-items:center; gap:8px;">
+                <div class="tab-stack">
+                    <div class="form-card">
+                        <h4 class="section-title" style="margin-bottom:var(--space-3);">
                             <i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i> リスク評価
                         </h4>
-                        <textarea id="editRiskAssessment" class="input" rows="6" placeholder="想定されるリスク、危険性、発生時の影響度など
-例：挟まれ・巻き込まれ、転倒・転落、感電、火災など"></textarea>
+                        <textarea id="editRiskAssessment" class="input" rows="6"
+                                  placeholder="想定されるリスク、危険性、発生時の影響度など&#10;例：挟まれ・巻き込まれ、転倒・転落、感電、火災など"></textarea>
                     </div>
-                    
-                    <div style="background:#fff; padding:20px; border:1px solid var(--border); border-radius:var(--radius-md);">
-                        <h4 style="margin:0 0 12px 0; display:flex; align-items:center; gap:8px;">
+
+                    <div class="form-card">
+                        <h4 class="section-title" style="margin-bottom:var(--space-3);">
                             <i class="fa-solid fa-shield-halved" style="color:var(--success);"></i> 安全対策・予防措置
                         </h4>
-                        <textarea id="editRiskMeasures" class="input" rows="6" placeholder="安全装置、保護具の使用、作業手順、教育訓練、緊急時対応など"></textarea>
+                        <textarea id="editRiskMeasures" class="input" rows="6"
+                                  placeholder="安全装置、保護具の使用、作業手順、教育訓練、緊急時対応など"></textarea>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab 4: Schedule Plans -->
+            <!-- Tab 6: 周期計画 -->
             <div id="tabSchedule" class="tab-pane">
-                <!-- 入力フォーム -->
-                <div style="background:#fff; padding:20px; border:1px solid var(--border); border-radius:var(--radius-md); margin-bottom:16px;">
-                    <h4 style="margin:0 0 16px 0; display:flex; align-items:center; gap:8px;">
-                        <i class="fa-solid fa-plus-circle" style="color:var(--primary);"></i> 新規周期計画追加
-                    </h4>
-                    <div style="display:grid; grid-template-columns: 180px 150px 1fr auto; gap:12px; align-items:start;">
-                        <div>
-                            <label style="font-size:0.85rem; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">日時</label>
-                            <input type="date" id="newScheduleDate" class="input" style="width:100%;">
-                        </div>
-                        <div>
-                            <label style="font-size:0.85rem; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">周期 (日)</label>
-                            <input type="number" id="newScheduleCycle" class="input" placeholder="例: 30" min="1" style="width:100%;">
-                        </div>
-                        <div>
-                            <label style="font-size:0.85rem; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">イベント内容</label>
-                            <textarea id="newScheduleEvent" class="input" rows="2" placeholder="例: 定期点検"></textarea>
-                        </div>
-                        <div style="display:flex; align-items:flex-end; height:100%;">
-                            <button class="btn btn-primary" onclick="addScheduleRecord()" style="white-space:nowrap; height:42px;">
+                <div class="tab-stack">
+                    <div class="form-card">
+                        <h4 class="section-title" style="margin-bottom:var(--space-4);">
+                            <i class="fa-solid fa-circle-plus" style="color:var(--primary);"></i> 新規周期計画追加
+                        </h4>
+                        <div style="display:grid; grid-template-columns:170px 130px 1fr auto; gap:var(--space-3); align-items:end;">
+                            <div class="field">
+                                <label class="field-label" for="newScheduleDate">実施予定日</label>
+                                <input type="date" id="newScheduleDate" class="input">
+                            </div>
+                            <div class="field">
+                                <label class="field-label" for="newScheduleCycle">周期（日）</label>
+                                <input type="number" id="newScheduleCycle" class="input" placeholder="例: 30" min="1">
+                            </div>
+                            <div class="field">
+                                <label class="field-label" for="newScheduleEvent">実施内容</label>
+                                <input type="text" id="newScheduleEvent" class="input" placeholder="例: 定期点検">
+                            </div>
+                            <button class="btn btn-primary" onclick="addScheduleRecord()" style="height:38px;">
                                 <i class="fa-solid fa-plus"></i> 追加
                             </button>
                         </div>
                     </div>
-                </div>
 
-                <!-- 並び替えコントロール -->
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                    <h4 style="margin:0; display:flex; align-items:center; gap:8px;">
-                        <i class="fa-solid fa-calendar-check" style="color:var(--primary);"></i> 周期計画一覧
-                    </h4>
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <span style="font-size:0.85rem; color:var(--text-sub); font-weight:600;">並び替え:</span>
-                        <button class="btn btn-outline btn-sm" onclick="sortSchedule('desc')" id="sortScheduleDescBtn">
-                            <i class="fa-solid fa-arrow-down-wide-short"></i> 新しい順
-                        </button>
-                        <button class="btn btn-ghost btn-sm" onclick="sortSchedule('asc')" id="sortScheduleAscBtn">
-                            <i class="fa-solid fa-arrow-up-wide-short"></i> 古い順
-                        </button>
+                    <div>
+                        <div class="section-head">
+                            <h4 class="section-title"><i class="fa-solid fa-calendar-check"></i> 周期計画一覧</h4>
+                            <div class="segmented">
+                                <button class="btn btn-sm" onclick="sortSchedule('desc')" id="sortScheduleDescBtn">新しい順</button>
+                                <button class="btn btn-sm btn-ghost" onclick="sortSchedule('asc')" id="sortScheduleAscBtn">古い順</button>
+                            </div>
+                        </div>
+                        <div id="scheduleRecordsContainer" class="panel"></div>
                     </div>
-                </div>
-
-                <!-- 周期計画リスト -->
-                <div id="scheduleRecordsContainer" style="background:#fff; border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden;">
-                    <!-- Schedule records will be rendered here -->
                 </div>
             </div>
 
-            <!-- Tab 5: History -->
+            <!-- Tab 7: 履歴 -->
             <div id="tabMaint" class="tab-pane">
-                <!-- 入力フォーム -->
-                <div style="background:#fff; padding:20px; border:1px solid var(--border); border-radius:var(--radius-md); margin-bottom:16px;">
-                    <h4 style="margin:0 0 16px 0; display:flex; align-items:center; gap:8px;">
-                        <i class="fa-solid fa-plus-circle" style="color:var(--primary);"></i> 新規イベント追加
-                    </h4>
-                    <div style="display:grid; grid-template-columns: 200px 1fr auto; gap:12px; align-items:start;">
-                        <div>
-                            <label style="font-size:0.85rem; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">日付</label>
-                            <input type="date" id="newHistoryDate" class="input" style="width:100%;">
-                        </div>
-                        <div>
-                            <label style="font-size:0.85rem; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">イベント内容</label>
-                            <textarea id="newHistoryEvent" class="input" rows="2" placeholder="実施した作業や発生したイベントを記入"></textarea>
-                        </div>
-                        <div style="display:flex; align-items:flex-end; height:100%;">
-                            <button class="btn btn-primary" onclick="addHistoryRecord()" style="white-space:nowrap; height:42px;">
+                <div class="tab-stack">
+                    <div class="form-card">
+                        <h4 class="section-title" style="margin-bottom:var(--space-4);">
+                            <i class="fa-solid fa-circle-plus" style="color:var(--primary);"></i> 新規イベント追加
+                        </h4>
+                        <div style="display:grid; grid-template-columns:190px 1fr auto; gap:var(--space-3); align-items:end;">
+                            <div class="field">
+                                <label class="field-label" for="newHistoryDate">実施日</label>
+                                <input type="date" id="newHistoryDate" class="input">
+                            </div>
+                            <div class="field">
+                                <label class="field-label" for="newHistoryEvent">実施内容</label>
+                                <input type="text" id="newHistoryEvent" class="input" placeholder="実施した作業や発生したイベントを記入">
+                            </div>
+                            <button class="btn btn-primary" onclick="addHistoryRecord()" style="height:38px;">
                                 <i class="fa-solid fa-plus"></i> 追加
                             </button>
                         </div>
                     </div>
-                </div>
 
-                <!-- 並び替えコントロール -->
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                    <h4 style="margin:0; display:flex; align-items:center; gap:8px;">
-                        <i class="fa-solid fa-clock-rotate-left" style="color:var(--primary);"></i> 履歴一覧
-                    </h4>
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <span style="font-size:0.85rem; color:var(--text-sub); font-weight:600;">並び替え:</span>
-                        <button class="btn btn-outline btn-sm" onclick="sortHistory('desc')" id="sortDescBtn">
-                            <i class="fa-solid fa-arrow-down-wide-short"></i> 新しい順
-                        </button>
-                        <button class="btn btn-ghost btn-sm" onclick="sortHistory('asc')" id="sortAscBtn">
-                            <i class="fa-solid fa-arrow-up-wide-short"></i> 古い順
-                        </button>
+                    <div>
+                        <div class="section-head">
+                            <h4 class="section-title"><i class="fa-solid fa-clock-rotate-left"></i> 履歴一覧</h4>
+                            <div class="segmented">
+                                <button class="btn btn-sm" onclick="sortHistory('desc')" id="sortDescBtn">新しい順</button>
+                                <button class="btn btn-sm btn-ghost" onclick="sortHistory('asc')" id="sortAscBtn">古い順</button>
+                            </div>
+                        </div>
+                        <div id="historyRecordsContainer" class="panel"></div>
                     </div>
-                </div>
-
-                <!-- 履歴リスト -->
-                <div id="historyRecordsContainer" style="background:#fff; border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden;">
-                    <!-- History records will be rendered here -->
                 </div>
             </div>
         </div>
 
         <div class="modal-footer">
-            <button id="deleteAssetBtn" class="btn btn-danger-ghost" style="margin-right:auto;" onclick="deleteCurrentAsset()">削除</button>
+            <button id="deleteAssetBtn" class="btn btn-danger-ghost btn-sm" style="margin-right:auto;" onclick="deleteCurrentAsset()">削除</button>
+            <span class="modal-footer-hint hide-sm"><span class="kbd">Ctrl</span><span class="kbd">S</span> でも保存できます</span>
             <button class="btn btn-outline" onclick="closeModal('assetModal')">キャンセル</button>
-            <button class="btn btn-primary" onclick="saveAssetChanges()">保存</button>
+            <button class="btn btn-primary" onclick="saveAssetChanges()">
+                <i class="fa-solid fa-check"></i> 保存
+            </button>
         </div>
     </div>
 </div>
@@ -409,163 +524,150 @@
 <div class="modal-overlay" id="masterModal">
     <div class="modal-full">
         <!-- Editor Header -->
-        <div style="padding:12px 24px; background:#fff; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; z-index:10;">
-            <div style="display:flex; align-items:center; gap:16px;">
-                <div style="font-weight:700; font-size:1.1rem; display:flex; align-items:center; gap:8px;">
-                    <i class="fa-solid fa-layer-group" style="color:var(--primary);"></i> 
+        <div style="padding:var(--space-3) var(--space-5); background:var(--surface); border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:var(--space-4); flex-wrap:wrap; z-index:10;">
+            <div style="display:flex; align-items:center; gap:var(--space-4); flex-wrap:wrap;">
+                <div style="font-weight:700; font-size:var(--text-md); display:flex; align-items:center; gap:var(--space-2); color:var(--text-strong);">
+                    <i class="fa-solid fa-layer-group" style="color:var(--primary);"></i>
                     <span id="masterModalTitle">マスタ構成編集</span>
                 </div>
-                
-                <!-- タブ切り替え -->
-                <div style="background:#f8fafc; padding:4px; border-radius:var(--radius-md); display:flex; gap:4px;">
-                    <button class="btn btn-sm" id="btnMasterTabTags" style="padding:6px 16px;" onclick="switchMasterTab('tags')">
+
+                <!-- 編集対象の切り替え -->
+                <div class="segmented">
+                    <button class="btn btn-sm" id="btnMasterTabTags" onclick="switchMasterTab('tags')">
                         <i class="fa-solid fa-tag"></i> タグ管理
                     </button>
-                    <button class="btn btn-sm btn-ghost" id="btnMasterTabAssets" style="padding:6px 16px;" onclick="switchMasterTab('assets')">
+                    <button class="btn btn-sm btn-ghost" id="btnMasterTabAssets" onclick="switchMasterTab('assets')">
                         <i class="fa-solid fa-sitemap"></i> 資産構成
                     </button>
                 </div>
-                
+
                 <!-- ビュー切り替え -->
-                <div style="background:#f1f5f9; padding:4px; border-radius:var(--radius-md); display:flex; gap:4px;">
-                    <button class="btn btn-sm" id="btnMasterViewList" style="padding:6px 12px;" onclick="switchView('list')">
+                <div class="segmented">
+                    <button class="btn btn-sm" id="btnMasterViewList" onclick="switchView('list')">
                         <i class="fa-solid fa-list-ul"></i> リスト
                     </button>
-                    <button class="btn btn-sm btn-ghost" id="btnMasterViewGraph" style="padding:6px 12px;" onclick="switchView('graph')">
+                    <button class="btn btn-sm btn-ghost" id="btnMasterViewGraph" onclick="switchView('graph')">
                         <i class="fa-solid fa-diagram-project"></i> グラフ
                     </button>
                 </div>
             </div>
-            <div style="display:flex; gap:12px;">
+            <div style="display:flex; gap:var(--space-3); align-items:center;">
                 <button class="btn btn-outline" onclick="closeModal('masterModal')">閉じる</button>
-                <button class="btn btn-primary" onclick="saveMasterChanges()">保存して反映</button>
+                <button class="btn btn-primary" onclick="saveMasterChanges()">
+                    <i class="fa-solid fa-check"></i> 保存して反映
+                </button>
             </div>
         </div>
 
         <!-- エディターエリアコンテナ -->
         <div style="flex:1; min-height:0; overflow:hidden; position:relative;">
             <div class="editor-layout" id="tagsEditorArea">
-            <!-- Left Category Select -->
-            <div class="editor-sidebar">
-                <div class="nav-label">編集対象のマスタ</div>
-                <div id="masterCategoryList"></div>
-                <button class="btn btn-ghost btn-sm" style="width:100%; margin-top:8px; border:1px dashed var(--border);" onclick="addNewMasterDefinition()">
-                    <i class="fa-solid fa-plus"></i> 新規マスタ定義
-                </button>
-            </div>
-
-            <!-- Main Editor Area -->
-            <div class="editor-main" id="editorArea">
-                <!-- 1. LIST VIEW -->
-                <div id="listView" class="list-editor-container">
-                    <!-- JS Generated -->
+                <!-- Left Category Select -->
+                <div class="editor-sidebar">
+                    <div class="nav-section-label" style="padding-left:8px;">編集対象のマスタ</div>
+                    <div id="masterCategoryList"></div>
+                    <button class="btn btn-ghost btn-sm" style="width:100%; margin-top:var(--space-2); border:1px dashed var(--border-strong);" onclick="addNewMasterDefinition()">
+                        <i class="fa-solid fa-plus"></i> 新規マスタ定義
+                    </button>
                 </div>
 
-                <!-- 2. GRAPH VIEW (Improved) -->
-                <div id="graphView" class="graph-wrapper" style="display:none;" onmousedown="handleGraphPanStart(event)">
-                    <!-- Scalable Canvas -->
-                    <div id="graphCanvas" class="graph-canvas">
-                        <div class="graph-bg"></div>
-                        <svg class="connections" id="graphSvg"></svg>
-                        <div id="graphNodesContainer"></div>
+                <!-- Main Editor Area -->
+                <div class="editor-main" id="editorArea">
+                    <!-- 1. LIST VIEW -->
+                    <div id="listView" class="list-editor-container"></div>
+
+                    <!-- 2. GRAPH VIEW -->
+                    <div id="graphView" class="graph-wrapper" style="display:none;" onmousedown="handleGraphPanStart(event)">
+                        <div id="graphCanvas" class="graph-canvas">
+                            <div class="graph-bg"></div>
+                            <svg class="connections" id="graphSvg"></svg>
+                            <div id="graphNodesContainer"></div>
+                        </div>
+
+                        <div class="zoom-controls">
+                            <div class="zoom-btn" onclick="updateZoom(0.1)" title="拡大"><i class="fa-solid fa-plus"></i></div>
+                            <div class="zoom-btn" onclick="updateZoom(-0.1)" title="縮小"><i class="fa-solid fa-minus"></i></div>
+                            <div class="zoom-btn" onclick="autoFitGraph()" title="全体表示"><i class="fa-solid fa-compress"></i></div>
+                        </div>
+
+                        <div class="graph-legend">
+                            <div style="display:flex; align-items:center; cursor:pointer; user-select:none;" onclick="toggleGraphLegend('tags')">
+                                <i class="fa-solid fa-chevron-right" id="tagsLegendChevron" style="font-size:0.65rem; color:var(--text-sub); margin-right:6px; transition:transform 0.2s;"></i>
+                                <div style="font-weight:700;">操作ガイド</div>
+                            </div>
+                            <div id="tagsLegendContent" style="display:none; margin-top:8px;">
+                                <div class="legend-item"><i class="fa-solid fa-hand"></i> 余白ドラッグ：移動</div>
+                                <div class="legend-item"><i class="fa-solid fa-up-down"></i> ホイール：ズーム</div>
+                                <div class="legend-item"><i class="fa-solid fa-arrow-pointer"></i> クリック：選択</div>
+                                <div class="legend-item"><i class="fa-solid fa-mouse-pointer"></i> ダブルクリック（ノード）：名称編集</div>
+                                <div class="legend-item"><i class="fa-solid fa-plus-circle"></i> ダブルクリック（空白）：即座にノード追加</div>
+                                <div class="legend-item"><i class="fa-solid fa-keyboard"></i> Delキー：削除</div>
+                                <div class="legend-item" style="font-size:0.75rem; color:var(--text-faint);">※ポートからドラッグで接続</div>
+                                <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border);">
+                                    <div style="font-weight:600; font-size:0.75rem; margin-bottom:4px; color:var(--text-sub);">階層構造ルール</div>
+                                    <div class="legend-item" style="font-size:0.7rem; color:var(--text-sub);">• 同階層の複数親OK</div>
+                                    <div class="legend-item" style="font-size:0.7rem; color:var(--text-sub);">• 階層飛び越しは自動調整</div>
+                                    <div class="legend-item" style="font-size:0.7rem; color:var(--text-sub);">• 階層レベルは統一される</div>
+                                    <div class="legend-item" style="font-size:0.7rem; color:var(--text-sub);">• 循環参照は禁止</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="position:absolute; bottom:24px; right:24px; display:flex; gap:8px;">
+                            <button class="btn btn-primary" style="box-shadow:var(--shadow-lg); border-radius:var(--radius-full);" onclick="addNodeToGraph()">
+                                <i class="fa-solid fa-plus"></i> ノード追加
+                            </button>
+                        </div>
                     </div>
-                    
-                    <!-- Zoom Controls -->
-                    <div class="zoom-controls">
-                        <div class="zoom-btn" onclick="updateZoom(0.1)" title="拡大"><i class="fa-solid fa-plus"></i></div>
-                        <div class="zoom-btn" onclick="updateZoom(-0.1)" title="縮小"><i class="fa-solid fa-minus"></i></div>
-                        <div class="zoom-btn" onclick="autoFitGraph()" title="全体表示"><i class="fa-solid fa-compress"></i></div>
+                </div>
+            </div>
+
+            <!-- 資産構成管理エリア -->
+            <div id="assetsEditorArea" style="display:none; height:100%; position:relative;">
+                <div id="assetsListView" class="list-editor-container"></div>
+
+                <div id="assetsGraphView" class="graph-wrapper" style="display:none;" onmousedown="handleAssetGraphPanStart(event)">
+                    <div id="assetsGraphCanvas" class="graph-canvas">
+                        <div class="graph-bg"></div>
+                        <svg class="connections" id="assetsGraphSvg"></svg>
+                        <div id="assetsGraphNodesContainer"></div>
                     </div>
 
-                    <!-- Legend -->
+                    <div class="zoom-controls">
+                        <div class="zoom-btn" onclick="updateAssetsZoom(0.1)" title="拡大"><i class="fa-solid fa-plus"></i></div>
+                        <div class="zoom-btn" onclick="updateAssetsZoom(-0.1)" title="縮小"><i class="fa-solid fa-minus"></i></div>
+                        <div class="zoom-btn" onclick="autoFitAssetsGraph()" title="全体表示"><i class="fa-solid fa-compress"></i></div>
+                    </div>
+
                     <div class="graph-legend">
-                        <div style="display:flex; align-items:center; cursor:pointer; user-select:none;" onclick="toggleGraphLegend('tags')">
-                            <i class="fa-solid fa-chevron-right" id="tagsLegendChevron" style="font-size:0.7rem; color:#64748b; margin-right:6px; transition:transform 0.2s;"></i>
+                        <div style="display:flex; align-items:center; cursor:pointer; user-select:none;" onclick="toggleGraphLegend('assets')">
+                            <i class="fa-solid fa-chevron-right" id="assetsLegendChevron" style="font-size:0.65rem; color:var(--text-sub); margin-right:6px; transition:transform 0.2s;"></i>
                             <div style="font-weight:700;">操作ガイド</div>
                         </div>
-                        <div id="tagsLegendContent" style="display:none; margin-top:8px;">
+                        <div id="assetsLegendContent" style="display:none; margin-top:8px;">
                             <div class="legend-item"><i class="fa-solid fa-hand"></i> 余白ドラッグ：移動</div>
                             <div class="legend-item"><i class="fa-solid fa-up-down"></i> ホイール：ズーム</div>
                             <div class="legend-item"><i class="fa-solid fa-arrow-pointer"></i> クリック：選択</div>
                             <div class="legend-item"><i class="fa-solid fa-mouse-pointer"></i> ダブルクリック（ノード）：名称編集</div>
                             <div class="legend-item"><i class="fa-solid fa-plus-circle"></i> ダブルクリック（空白）：即座にノード追加</div>
                             <div class="legend-item"><i class="fa-solid fa-keyboard"></i> Delキー：削除</div>
-                            <div class="legend-item" style="font-size:0.75rem; color:#94a3b8;">※ポートからドラッグで接続</div>
-                            <div style="margin-top:12px; padding-top:8px; border-top:1px solid #e2e8f0;">
-                                <div style="font-weight:600; font-size:0.75rem; margin-bottom:4px; color:#475569;">階層構造ルール</div>
-                                <div class="legend-item" style="font-size:0.7rem; color:#64748b;">• 同階層の複数親OK</div>
-                                <div class="legend-item" style="font-size:0.7rem; color:#64748b;">• 階層飛び越しは自動調整</div>
-                                <div class="legend-item" style="font-size:0.7rem; color:#64748b;">• 階層レベルは統一される</div>
-                                <div class="legend-item" style="font-size:0.7rem; color:#64748b;">• 循環参照は禁止</div>
+                            <div class="legend-item" style="font-size:0.75rem; color:var(--text-faint);">※ポートからドラッグで親子接続</div>
+                            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border);">
+                                <div style="font-weight:600; font-size:0.75rem; margin-bottom:4px; color:var(--text-sub);">親子関係ルール</div>
+                                <div class="legend-item" style="font-size:0.7rem; color:var(--text-sub);">• 単一親のみ（複数親は不可）</div>
+                                <div class="legend-item" style="font-size:0.7rem; color:var(--text-sub);">• 循環参照は禁止</div>
+                                <div class="legend-item" style="font-size:0.7rem; color:var(--text-sub);">• 階層の深さ制限なし</div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Graph Controls -->
                     <div style="position:absolute; bottom:24px; right:24px; display:flex; gap:8px;">
-                        <button class="btn btn-primary" style="box-shadow:var(--shadow-lg); border-radius:24px;" onclick="addNodeToGraph()">
-                            <i class="fa-solid fa-plus"></i> ノード追加
+                        <button class="btn btn-primary" style="box-shadow:var(--shadow-lg); border-radius:var(--radius-full);" onclick="addAssetNodeToGraph()">
+                            <i class="fa-solid fa-plus"></i> 資産追加
                         </button>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <!-- 資産構成管理エリア -->
-        <div id="assetsEditorArea" style="display:none; height:100%; position:relative;">
-            <!-- 1. LIST VIEW -->
-            <div id="assetsListView" class="list-editor-container">
-                <!-- JS Generated -->
-            </div>
-
-            <!-- 2. GRAPH VIEW -->
-            <div id="assetsGraphView" class="graph-wrapper" style="display:none;" onmousedown="handleAssetGraphPanStart(event)">
-                <!-- Scalable Canvas -->
-                <div id="assetsGraphCanvas" class="graph-canvas">
-                    <div class="graph-bg"></div>
-                    <svg class="connections" id="assetsGraphSvg"></svg>
-                    <div id="assetsGraphNodesContainer"></div>
-                </div>
-                
-                <!-- Zoom Controls -->
-                <div class="zoom-controls">
-                    <div class="zoom-btn" onclick="updateAssetsZoom(0.1)" title="拡大"><i class="fa-solid fa-plus"></i></div>
-                    <div class="zoom-btn" onclick="updateAssetsZoom(-0.1)" title="縮小"><i class="fa-solid fa-minus"></i></div>
-                    <div class="zoom-btn" onclick="autoFitAssetsGraph()" title="全体表示"><i class="fa-solid fa-compress"></i></div>
-                </div>
-
-                <!-- Legend -->
-                <div class="graph-legend">
-                    <div style="display:flex; align-items:center; cursor:pointer; user-select:none;" onclick="toggleGraphLegend('assets')">
-                        <i class="fa-solid fa-chevron-right" id="assetsLegendChevron" style="font-size:0.7rem; color:#64748b; margin-right:6px; transition:transform 0.2s;"></i>
-                        <div style="font-weight:700;">操作ガイド</div>
-                    </div>
-                    <div id="assetsLegendContent" style="display:none; margin-top:8px;">
-                        <div class="legend-item"><i class="fa-solid fa-hand"></i> 余白ドラッグ：移動</div>
-                        <div class="legend-item"><i class="fa-solid fa-up-down"></i> ホイール：ズーム</div>
-                        <div class="legend-item"><i class="fa-solid fa-arrow-pointer"></i> クリック：選択</div>
-                        <div class="legend-item"><i class="fa-solid fa-mouse-pointer"></i> ダブルクリック（ノード）：名称編集</div>
-                        <div class="legend-item"><i class="fa-solid fa-plus-circle"></i> ダブルクリック（空白）：即座にノード追加</div>
-                        <div class="legend-item"><i class="fa-solid fa-keyboard"></i> Delキー：削除</div>
-                        <div class="legend-item" style="font-size:0.75rem; color:#94a3b8;">※ポートからドラッグで親子接続</div>
-                        <div style="margin-top:12px; padding-top:8px; border-top:1px solid #e2e8f0;">
-                            <div style="font-weight:600; font-size:0.75rem; margin-bottom:4px; color:#475569;">親子関係ルール</div>
-                            <div class="legend-item" style="font-size:0.7rem; color:#64748b;">• 単一親のみ（複数親は不可）</div>
-                            <div class="legend-item" style="font-size:0.7rem; color:#64748b;">• 循環参照は禁止</div>
-                            <div class="legend-item" style="font-size:0.7rem; color:#64748b;">• 階層の深さ制限なし</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Graph Controls -->
-                <div style="position:absolute; bottom:24px; right:24px; display:flex; gap:8px;">
-                    <button class="btn btn-primary" style="box-shadow:var(--shadow-lg); border-radius:24px;" onclick="addAssetNodeToGraph()">
-                        <i class="fa-solid fa-plus"></i> 資産追加
-                    </button>
-                </div>
-            </div>
-        </div>
-        <!-- エディターエリアコンテナ終了 -->
         </div>
     </div>
 </div>
@@ -574,30 +676,76 @@
      LIST SETTINGS MODAL
      ============================================= -->
 <div class="modal-overlay" id="listSettingsModal">
-    <div style="width:900px; max-width:95%; max-height:85vh; background:var(--surface); border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow-lg); display:flex; flex-direction:column;">
+    <div class="modal-wide">
         <div class="modal-header">
-            <h3 style="margin:0; font-size:1.2rem; font-weight:700; display:flex; align-items:center; gap:8px;">
-                <i class="fa-solid fa-sliders" style="color:var(--primary);"></i> リスト表示設定
-            </h3>
-            <button class="btn btn-ghost btn-icon-only" onclick="closeModal('listSettingsModal')" title="閉じる">
-                <i class="fa-solid fa-times"></i>
-            </button>
-        </div>
-        
-        <div style="padding:24px; flex:1; overflow:hidden;">
-            <div id="listColumnsContainer">
+            <div class="modal-title-block">
+                <h3><i class="fa-solid fa-table-columns" style="color:var(--primary);"></i> リストの列を設定</h3>
+                <div class="modal-meta-row">表示する列と並び順を変更できます</div>
+            </div>
+            <div class="modal-header-actions">
+                <button class="btn btn-ghost btn-icon-only" onclick="closeModal('listSettingsModal')" title="閉じる" aria-label="閉じる">
+                    <i class="fa-solid fa-xmark fa-lg"></i>
+                </button>
             </div>
         </div>
-        
+
+        <div style="padding:var(--space-5); flex:1; overflow:hidden;">
+            <div id="listColumnsContainer"></div>
+        </div>
+
         <div class="modal-footer">
-            <button class="btn btn-outline" onclick="resetListSettings()">デフォルトに戻す</button>
-            <button class="btn btn-primary" onclick="saveListSettings()">保存</button>
+            <button class="btn btn-ghost btn-sm" style="margin-right:auto;" onclick="resetListSettings()">
+                <i class="fa-solid fa-rotate-left"></i> デフォルトに戻す
+            </button>
+            <button class="btn btn-outline" onclick="closeModal('listSettingsModal')">キャンセル</button>
+            <button class="btn btn-primary" onclick="saveListSettings()"><i class="fa-solid fa-check"></i> 保存</button>
         </div>
     </div>
 </div>
 
+<!-- =============================================
+     KEYBOARD SHORTCUTS (?)
+     ============================================= -->
+<div class="modal-overlay" id="keyHelpModal">
+    <div class="modal-wide" style="max-height:80vh;">
+        <div class="modal-header">
+            <div class="modal-title-block">
+                <h3><i class="fa-solid fa-keyboard" style="color:var(--primary);"></i> キーボードショートカット</h3>
+                <div class="modal-meta-row">よく使う操作はキーだけで完了できます</div>
+            </div>
+            <div class="modal-header-actions">
+                <button class="btn btn-ghost btn-icon-only" onclick="closeModal('keyHelpModal')" title="閉じる" aria-label="閉じる">
+                    <i class="fa-solid fa-xmark fa-lg"></i>
+                </button>
+            </div>
+        </div>
+        <div style="padding:var(--space-5); overflow-y:auto;">
+            <div class="keyhelp-grid" id="keyHelpContent"></div>
+        </div>
+    </div>
+</div>
+
+<!-- =============================================
+     IMAGE LIGHTBOX
+     ============================================= -->
+<div class="lightbox" id="lightbox" onclick="if(event.target===this) closeLightbox()">
+    <button class="lightbox-btn lightbox-close" onclick="closeLightbox()" title="閉じる (Esc)" aria-label="閉じる">
+        <i class="fa-solid fa-xmark"></i>
+    </button>
+    <img id="lightboxImg" src="" alt="">
+    <div class="lightbox-bar">
+        <button class="lightbox-btn" onclick="stepLightbox(-1)" title="前の画像 (←)" aria-label="前の画像">
+            <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <span class="lightbox-caption" id="lightboxCaption"></span>
+        <button class="lightbox-btn" onclick="stepLightbox(1)" title="次の画像 (→)" aria-label="次の画像">
+            <i class="fa-solid fa-chevron-right"></i>
+        </button>
+    </div>
+</div>
+
 <!-- Toast -->
-<div class="toast" id="toast">
+<div class="toast" id="toast" role="status" aria-live="polite">
     <i class="fa-solid fa-circle-check" style="color:#4ade80;"></i> <span id="toastMsg">Action Successful</span>
 </div>
 
@@ -610,11 +758,13 @@
 <script src="js/dashboard.js"></script>
 <script src="js/maintenance.js"></script>
 <script src="js/import-export.js"></script>
+<script src="js/image-input.js"></script>
 <script src="js/assets.js"></script>
 <script src="js/asset-modal.js"></script>
 <script src="js/master.js"></script>
 <script src="js/graph.js"></script>
 <script src="js/list-settings.js"></script>
+<script src="js/command-palette.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

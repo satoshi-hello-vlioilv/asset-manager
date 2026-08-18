@@ -14,27 +14,27 @@ const availableColumns = [
     { key: 'status', label: 'ステータス', category: '基本情報' },
     { key: 'specs', label: '備考・特記事項', category: '基本情報' },
     { key: 'parentAsset', label: '親資産', category: '基本情報' },
-    
+
     // タグ（マスタ別）は addCustomFieldColumns() で動的に生成
-    
+
     // 運用基準・手順
     { key: 'operations.procedure', label: '標準操作手順', category: '運用基準・手順' },
     { key: 'operations.checkpoints', label: '点検項目', category: '運用基準・手順' },
-    
+
     // リスク管理・安全
     { key: 'risk.assessment', label: 'リスク評価', category: 'リスク管理・安全' },
     { key: 'risk.measures', label: '安全対策', category: 'リスク管理・安全' },
-    
+
     // 履歴
     { key: 'maintenance.count', label: '履歴件数', category: '履歴' },
     { key: 'maintenance.latest', label: '最新履歴日', category: '履歴' },
     { key: 'maintenance.latestEvent', label: '最新履歴内容', category: '履歴' },
-    
+
     // 周期計画
     { key: 'scheduledPlans.count', label: '計画件数', category: '周期計画' },
     { key: 'scheduledPlans.next', label: '次回予定日', category: '周期計画' },
     { key: 'scheduledPlans.nextEvent', label: '次回予定内容', category: '周期計画' },
-    
+
     // 画像
     { key: 'images.count', label: '画像枚数', category: '画像' }
 ];
@@ -56,8 +56,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // UIの描画
     renderSidebar();
     showDashboard(); // デフォルトでダッシュボードを表示
+
     setupGlobalEvents();
-    setupGlobalDropZone(); // JSONファイルのグローバルドラッグアンドドロップを設定
+    setupGlobalDropZone();     // JSON / 画像のグローバルドラッグ&ドロップ
+    setupImagePasteHandler();  // Ctrl+V での画像貼り付け
+    setupPaletteEvents();      // コマンドパレット
 });
 
 /**
@@ -70,7 +73,7 @@ function addCustomFieldColumns() {
             availableColumns.splice(i, 1);
         }
     }
-    
+
     // マスタごとにタグ列を動的に生成
     masters.forEach(m => {
         availableColumns.push({
@@ -80,11 +83,11 @@ function addCustomFieldColumns() {
             masterId: m.id
         });
     });
-    
+
     // 全タグからカスタムフィールドを収集
     tags.forEach(tag => {
         if(!tag.customFields || tag.customFields.length === 0) return;
-        
+
         tag.customFields.forEach(field => {
             availableColumns.push({
                 key: `custom.${tag.id}.${field.key}`,
@@ -98,31 +101,44 @@ function addCustomFieldColumns() {
     });
 }
 
-/**
- * グローバルイベントのセットアップ（キーボード、マウスホイール）
- */
+/* ============================================================
+   グローバルイベント
+   ============================================================ */
+
+/** 入力中かどうか（ショートカットを誤爆させないための判定） */
+function isTypingContext(target) {
+    if(!target) return false;
+    return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+}
+
+/** 最前面に開いているモーダルのID（なければ null） */
+function getTopModalId() {
+    const openModals = document.querySelectorAll('.modal-overlay.open');
+    return openModals.length > 0 ? openModals[openModals.length - 1].id : null;
+}
+
+/* 連続キー（G → D など）の待ち受け状態 */
+let pendingChord = null;
+let pendingChordTimer = null;
+
 function setupGlobalEvents() {
-    // Keyboard Delete
+    /* --- グラフビューでの Delete キー --- */
     document.addEventListener('keydown', (e) => {
-        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElement && currentView === 'graph' && document.getElementById('masterModal').classList.contains('open')) {
-            // Ignore if typing in input
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if((e.key === 'Delete' || e.key === 'Backspace') && selectedElement && currentView === 'graph'
+           && document.getElementById('masterModal').classList.contains('open')) {
+            if(isTypingContext(e.target)) return;
 
             if(currentMasterMode === 'assets') {
-                // 資産モード
-                if (selectedElement.type === 'asset-link') {
-                    // 親子関係を解除
+                if(selectedElement.type === 'asset-link') {
                     unlinkAssetParent(selectedElement.id);
                     selectedElement = null;
-                } else if (selectedElement.type === 'asset-node') {
-                    // 資産ノードを削除
+                } else if(selectedElement.type === 'asset-node') {
                     deleteAssetNodeFromGraph(selectedElement.id);
                 }
             } else {
-                // タグモード
-                if (selectedElement.type === 'node') {
+                if(selectedElement.type === 'node') {
                     deleteTag(selectedElement.id);
-                } else if (selectedElement.type === 'link') {
+                } else if(selectedElement.type === 'link') {
                     removeLink(selectedElement.childId, selectedElement.parentId);
                 }
                 selectedElement = null;
@@ -130,36 +146,94 @@ function setupGlobalEvents() {
         }
     });
 
-    // キーボードショートカット
-    // - Esc: 最前面のモーダル（またはモバイルサイドバー）を閉じる
-    // - Ctrl(⌘)+K: 検索ボックスへフォーカス
+    /* --- アプリ全体のキーボードショートカット --- */
     document.addEventListener('keydown', (e) => {
         if(e.isComposing) return; // 日本語入力の変換中は無視
 
+        const typing = isTypingContext(e.target);
+        const modKey = e.ctrlKey || e.metaKey;
+
+        /* Esc: 開いているものを内側から順に閉じる */
         if(e.key === 'Escape') {
-            const openModals = document.querySelectorAll('.modal-overlay.open');
-            if(openModals.length > 0) {
-                closeModal(openModals[openModals.length - 1].id);
-                return;
-            }
-            if(document.body.classList.contains('sidebar-open')) {
-                toggleSidebar(false);
+            if(isLightboxOpen()) { closeLightbox(); return; }
+            if(isPaletteOpen())  { closePalette();  return; }
+            if(document.querySelector('.menu.open')) { closeMenus(); return; }
+
+            const topModal = getTopModalId();
+            if(topModal) { closeModal(topModal); return; }
+
+            if(document.body.classList.contains('sidebar-open')) toggleSidebar(false);
+            return;
+        }
+
+        /* ライトボックス表示中は左右キーで送る */
+        if(isLightboxOpen()) {
+            if(e.key === 'ArrowLeft')  { e.preventDefault(); stepLightbox(-1); return; }
+            if(e.key === 'ArrowRight') { e.preventDefault(); stepLightbox(1);  return; }
+        }
+
+        /* Ctrl/⌘ + K: コマンドパレット（どこからでも） */
+        if(modKey && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            isPaletteOpen() ? closePalette() : openPalette();
+            return;
+        }
+
+        /* Ctrl/⌘ + S: 編集中の資産を保存 */
+        if(modKey && e.key.toLowerCase() === 's') {
+            if(document.getElementById('assetModal').classList.contains('open')) {
+                e.preventDefault();
+                saveAssetChanges();
             }
             return;
         }
 
-        if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-            e.preventDefault();
-            if(currentPage !== 'assets') showAssets();
-            const searchInput = document.getElementById('searchInput');
-            if(searchInput) {
-                searchInput.focus();
-                searchInput.select();
-            }
+        // ここから先は、入力中・モーダル表示中には反応させない
+        if(typing || isPaletteOpen() || getTopModalId()) return;
+
+        /* 連続キー（G のあとに D / A） */
+        if(pendingChord === 'g') {
+            clearTimeout(pendingChordTimer);
+            pendingChord = null;
+            if(e.key.toLowerCase() === 'd') { e.preventDefault(); showDashboard(); return; }
+            if(e.key.toLowerCase() === 'a') { e.preventDefault(); showAssets();    return; }
+        }
+
+        switch(e.key) {
+            case '/':
+                e.preventDefault();
+                if(currentPage !== 'assets') showAssets();
+                const searchInput = document.getElementById('searchInput');
+                if(searchInput) { searchInput.focus(); searchInput.select(); }
+                return;
+            case 'n': case 'N':
+                e.preventDefault();
+                createNewAsset();
+                return;
+            case '?':
+                e.preventDefault();
+                openKeyHelp();
+                return;
+            case 'g': case 'G':
+                pendingChord = 'g';
+                clearTimeout(pendingChordTimer);
+                pendingChordTimer = setTimeout(() => { pendingChord = null; }, 1200);
+                return;
+            case '1': case '2': case '3':
+                if(currentPage === 'assets') {
+                    e.preventDefault();
+                    switchAssetView({ '1': 'list', '2': 'card', '3': 'calendar' }[e.key]);
+                }
+                return;
         }
     });
 
-    // モバイル表示時：サイドバー内の項目を選択したら自動で閉じる
+    /* --- メニューは外側クリックで閉じる --- */
+    document.addEventListener('click', (e) => {
+        if(!e.target.closest('.menu-wrap')) closeMenus();
+    });
+
+    /* --- モバイル表示時：サイドバー内の項目を選択したら自動で閉じる --- */
     const sidebarNav = document.getElementById('sidebarNav');
     if(sidebarNav) {
         sidebarNav.addEventListener('click', (e) => {
@@ -171,28 +245,24 @@ function setupGlobalEvents() {
         });
     }
 
-    // Mouse Wheel Zoom on Graph Area (タグ用)
+    /* --- グラフのホイールズーム --- */
     const graphView = document.getElementById('graphView');
     if(graphView) {
         graphView.addEventListener('wheel', (e) => {
             if(currentView === 'graph' && currentMasterMode === 'tags') {
                 e.preventDefault();
-                const delta = e.deltaY > 0 ? -0.1 : 0.1;
-                updateZoom(delta);
+                updateZoom(e.deltaY > 0 ? -0.1 : 0.1);
             }
         }, { passive: false });
     }
-    
-    // Mouse Wheel Zoom on Graph Area (資産用)
+
     const assetsGraphView = document.getElementById('assetsGraphView');
     if(assetsGraphView) {
         assetsGraphView.addEventListener('wheel', (e) => {
             if(currentView === 'graph' && currentMasterMode === 'assets') {
                 e.preventDefault();
-                const delta = e.deltaY > 0 ? -0.1 : 0.1;
-                updateAssetsZoom(delta);
+                updateAssetsZoom(e.deltaY > 0 ? -0.1 : 0.1);
             }
         }, { passive: false });
     }
 }
-
