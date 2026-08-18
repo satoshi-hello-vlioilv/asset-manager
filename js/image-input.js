@@ -169,9 +169,11 @@ async function handleImageFiles(files, options = {}) {
     let added = 0;
     for(const file of imageFiles) {
         try {
-            const dataUrl = await compressImage(file);
+            const blob = await compressImage(file);
+            const id = newImageId();
+            await putImageBlob(id, blob, { assetId: asset.id });
             asset.images.push({
-                url: dataUrl,
+                id,
                 comment: buildImageComment(file),
                 selected: asset.images.length === 0 // 最初の1枚は自動で代表画像にする
             });
@@ -228,44 +230,44 @@ function afterImagesChanged() {
 
 /**
  * 画像を保存に適したサイズへ縮小する
+ * base64ではなくBlobのまま返し、そのまま IndexedDB に格納する。
  * @param {File|Blob} file
- * @returns {Promise<string>} data URL
+ * @returns {Promise<Blob>}
  */
 function compressImage(file) {
     return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error('read failed'));
-        reader.onload = () => {
-            const originalDataUrl = reader.result;
-            const img = new Image();
-            img.onerror = () => reject(new Error('decode failed'));
-            img.onload = () => {
-                const longest = Math.max(img.width, img.height);
+        const objectUrl = URL.createObjectURL(file);
+        const img = new Image();
 
-                // 小さい画像はそのまま保存（無駄な再エンコードで劣化させない）
-                if(file.size <= IMAGE_SKIP_BYTES && longest <= IMAGE_MAX_DIMENSION) {
-                    resolve(originalDataUrl);
-                    return;
-                }
+        img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('decode failed')); };
+        img.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+            const longest = Math.max(img.width, img.height);
 
-                const scale = Math.min(1, IMAGE_MAX_DIMENSION / longest);
-                const canvas = document.createElement('canvas');
-                canvas.width  = Math.round(img.width * scale);
-                canvas.height = Math.round(img.height * scale);
+            // 小さい画像はそのまま保存（無駄な再エンコードで劣化させない）
+            if(file.size <= IMAGE_SKIP_BYTES && longest <= IMAGE_MAX_DIMENSION) {
+                resolve(file);
+                return;
+            }
 
-                const ctx = canvas.getContext('2d');
-                ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const scale = Math.min(1, IMAGE_MAX_DIMENSION / longest);
+            const canvas = document.createElement('canvas');
+            canvas.width  = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
 
-                const mime = supportsWebP() ? 'image/webp' : 'image/jpeg';
-                const encoded = canvas.toDataURL(mime, IMAGE_QUALITY);
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
+            const mime = supportsWebP() ? 'image/webp' : 'image/jpeg';
+            canvas.toBlob(blob => {
+                if(!blob) { reject(new Error('encode failed')); return; }
                 // 圧縮しても小さくならない場合は元のデータを使う
-                resolve(encoded.length < originalDataUrl.length ? encoded : originalDataUrl);
-            };
-            img.src = originalDataUrl;
+                resolve(blob.size < file.size ? blob : file);
+            }, mime, IMAGE_QUALITY);
         };
-        reader.readAsDataURL(file);
+
+        img.src = objectUrl;
     });
 }
 
@@ -389,7 +391,7 @@ function renderImagesGallery() {
                 <div class="image-tile ${isSelected ? 'is-thumb' : ''}">
                     ${isSelected ? '<span class="image-tile-badge"><i class="fa-solid fa-star"></i> 代表</span>' : ''}
                     <div class="image-tile-figure" onclick="openLightbox(${index})" title="クリックで拡大">
-                        <img src="${escapeHTML(img.url)}" alt="${escapeHTML(img.comment || '登録画像')}" loading="lazy"
+                        <img src="${escapeHTML(getImageSrc(img))}" alt="${escapeHTML(img.comment || '登録画像')}" loading="lazy"
                              onerror="this.closest('.image-tile-figure').innerHTML='<i class=\\'fa-regular fa-image\\' style=\\'font-size:1.6rem; color:var(--slate-300);\\'></i>';">
                     </div>
                     <div class="image-tile-caption" title="${escapeHTML(img.comment || '')}">${escapeHTML(img.comment || '説明なし')}</div>
@@ -474,7 +476,7 @@ function updateLightbox() {
     if(!asset || !asset.images[lightboxIndex]) return;
 
     const img = asset.images[lightboxIndex];
-    document.getElementById('lightboxImg').src = img.url;
+    document.getElementById('lightboxImg').src = getImageSrc(img);
     document.getElementById('lightboxCaption').textContent =
         `${lightboxIndex + 1} / ${asset.images.length}　${img.comment || ''}`;
 }

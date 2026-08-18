@@ -931,9 +931,7 @@ function saveAssetChanges() {
                 status: Array.from(document.querySelectorAll('.status-checkbox:checked'))
                     .map(cb => cb.value),
                 specs: document.getElementById('editAssetSpecs').value,
-                // 互換性のためimageにもセット
-                image: currentImages.length > 0 ? currentImages[0].url : '', 
-                images: currentImages, 
+                images: currentImages,
                 tags: [...editingTags],
                 parentId: null, // 親資産は構成管理で設定
                 operations: {
@@ -954,6 +952,12 @@ function saveAssetChanges() {
             // 個別のリストへ手で足し込む必要はない。
             assets.push(newAsset);
 
+            // 下書き用の一時IDで保存していた画像を、正式な資産IDに結び付け直す
+            // （表示には影響しない情報なので、失敗しても保存自体は止めない）
+            newAsset.images.forEach(img => {
+                if(img.id) db.images.update(img.id, { assetId: newId }).catch(() => {});
+            });
+
             isNewAsset = false;
             // 次の登録で「前回と同じタグ」を提案できるよう覚えておく
             lastCreatedAssetId = newId;
@@ -973,13 +977,10 @@ function saveAssetChanges() {
             asset.tags = [...editingTags];
             // parentIdは構成管理で設定するのでここでは触らない
             
-            if (asset.images && asset.images.length > 0) {
-                 const selected = asset.images.find(i => i.selected);
-                 asset.image = selected ? selected.url : asset.images[0].url;
-            } else {
-                 asset.image = '';
-            }
-            
+            // 画像の実体は images ストアにあるため、資産側は参照のみを保持する
+            delete asset.image;
+
+
             asset.operations = {
                 procedure: document.getElementById('editOperationsProcedure').value,
                 checkpoints: document.getElementById('editOperationsCheckpoints').value
@@ -1020,7 +1021,9 @@ function saveAssetChanges() {
 
 function deleteCurrentAsset() {
     if(isNewAsset) {
-        // 新規作成中の場合は一時資産を破棄
+        // 新規作成中の場合は一時資産を破棄（貼り付けた画像も残さない）
+        const draft = assets.find(a => a.id === editingAssetId);
+        if(draft) deleteImagesOfAsset(draft);
         assets = assets.filter(a => a.id !== editingAssetId);
         isNewAsset = false;
         editingAssetId = null;
@@ -1044,6 +1047,7 @@ function deleteCurrentAsset() {
 
     // 子資産の親参照を外してから削除する（存在しない親を指したままにしない）
     children.forEach(child => { child.parentId = null; });
+    deleteImagesOfAsset(target); // 画像の実体も一緒に片付ける
     assets = assets.filter(a => a.id !== editingAssetId);
 
     isNewAsset = false;

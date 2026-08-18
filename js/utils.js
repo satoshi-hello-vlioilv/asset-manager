@@ -456,10 +456,10 @@ function renderStatusBadgesHTML(status, extraStyle = '') {
  */
 function getAssetThumbnailUrl(asset) {
     if(asset.images && asset.images.length > 0) {
-        const selected = asset.images.find(img => img.selected);
-        return (selected || asset.images[0]).url;
+        const selected = asset.images.find(img => img.selected) || asset.images[0];
+        return getImageSrc(selected);
     }
-    return asset.image || '';
+    return asset.image || ''; // 旧形式のデータが残っている場合の保険
 }
 
 /**

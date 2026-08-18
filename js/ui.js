@@ -106,7 +106,28 @@ function toggleMenu(id, event) {
     if(!menu) return;
     const wasOpen = menu.classList.contains('open');
     closeMenus();
-    if(!wasOpen) menu.classList.add('open');
+    if(!wasOpen) {
+        menu.classList.add('open');
+        if(id === 'dataMenu') refreshStorageUsage();
+    }
+}
+
+/**
+ * 保存容量の内訳をデータ管理メニューに表示する
+ * 画像を含めて端末に保存しているため、どれくらい使っているかを確認できるようにする。
+ */
+async function refreshStorageUsage() {
+    const el = document.getElementById('storageUsageText');
+    if(!el) return;
+
+    const stats = await getStorageStats();
+    const lines = [`画像 ${stats.count}枚 / ${formatBytes(stats.images)}`];
+    if(stats.total !== null) {
+        lines.push(stats.quota
+            ? `このサイト全体 ${formatBytes(stats.total)}（上限の目安 ${formatBytes(stats.quota)}）`
+            : `このサイト全体 ${formatBytes(stats.total)}`);
+    }
+    el.innerHTML = lines.map(escapeHTML).join('<br>');
 }
 
 function closeMenus() {

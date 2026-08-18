@@ -6,7 +6,11 @@
 
 // アプリケーションバージョン（セマンティックバージョニング）
 // サイドバーのアプリ名横に表示される。更新時はここを変更するだけでよい。
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.2.0';
+
+// データ形式のバージョン（DBとバックアップZIPの互換性判定に使う）
+// 3.0 から画像を images ストアに分離し、バックアップはZIP形式になった。
+const DATA_FORMAT_VERSION = '3.0';
 
 // Dexie.js データベース定義
 const DB_NAME = 'AssetManagerDB';
@@ -34,6 +38,18 @@ db.version(2).stores({
     tags: 'id, masterId, parentIds',
     masters: 'id',
     system: 'key'
+});
+
+// バージョン3: 画像を専用ストアに分離
+// images テーブルに画像の実体（Blob）を置き、資産側は参照（id）だけを持つ。
+// 以前は base64 の data URL を資産レコードに埋め込んでいたため、
+// 画像が増えるほど資産レコードが肥大化し、保存・読み込みが重くなっていた。
+db.version(3).stores({
+    assets: 'id, name, date, parentId, *tags',
+    tags: 'id, masterId, parentIds',
+    masters: 'id',
+    system: 'key',
+    images: 'id, assetId'
 });
 
 // カスタムフィールドのデータ型定義
@@ -355,7 +371,7 @@ async function saveDataToDB() {
             await db.system.put({ key: 'lastCreatedAssetId', value: lastCreatedAssetId });
             await db.system.put({ key: 'nextTagId', value: nextTagId });
             await db.system.put({ key: 'nextAssetId', value: nextAssetId });
-            await db.system.put({ key: 'version', value: '2.0' });
+            await db.system.put({ key: 'version', value: DATA_FORMAT_VERSION });
             await db.system.put({ key: 'saveDate', value: new Date().toISOString() });
         });
         
@@ -428,12 +444,26 @@ async function loadDataFromDB() {
             if(!tag.customFields) tag.customFields = [];
         });
 
+        // 画像の実体を読み込み、表示用のURLを用意する
+        await loadImageUrlCache();
+
+        // 旧形式（資産レコードにbase64を埋め込む方式）のデータを images ストアへ移す
+        const migrated = await migrateEmbeddedImages();
+        if(migrated > 0) {
+            console.log(`${migrated}枚の画像を images ストアへ移行しました`);
+            await saveDataToDB();
+        }
+
+        // 参照が外れたままの画像を片付ける（削除の取り消し期限を過ぎたもの）
+        await cleanupOrphanImages();
+
         console.log('DBからデータを読み込みました:', {
             masters: masters.length,
             tags: tags.length,
-            assets: assets.length
+            assets: assets.length,
+            images: imageUrlCache.size
         });
-        
+
         return true;
 
     } catch(error) {

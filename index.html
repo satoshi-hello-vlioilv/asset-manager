@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="タグ・マスタ定義・カスタムフィールドに対応した統合資産管理システム">
-    <meta name="theme-color" content="#2559eb">
+    <meta name="theme-color" content="#275388">
     <title>統合資産管理システム - Professional Edition</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
@@ -53,14 +53,20 @@
                 </div>
                 <div class="menu" id="dataMenu" style="bottom:calc(100% + 6px); top:auto; left:0; right:0;">
                     <div class="menu-label">バックアップ</div>
-                    <button class="menu-item" onclick="closeMenus(); exportToJSON();">
-                        <i class="fa-solid fa-file-arrow-down"></i>
-                        <span>JSONに書き出す<span class="menu-item-sub" style="display:block;">全資産・タグ・マスタ定義</span></span>
+                    <button class="menu-item" onclick="closeMenus(); exportToZIP();">
+                        <i class="fa-solid fa-file-zipper"></i>
+                        <span>ZIPでバックアップ<span class="menu-item-sub" style="display:block;">データと画像をまとめて保存</span></span>
                     </button>
                     <button class="menu-item" onclick="closeMenus(); document.getElementById('importFile').click();">
                         <i class="fa-solid fa-file-arrow-up"></i>
-                        <span>JSONから読み込む<span class="menu-item-sub" style="display:block;">画面にドロップしても可</span></span>
+                        <span>バックアップから復元<span class="menu-item-sub" style="display:block;">ZIP / 旧形式のJSONに対応</span></span>
                     </button>
+                    <div class="menu-sep"></div>
+                    <div class="menu-label">保存状況</div>
+                    <div class="menu-item" style="cursor:default; align-items:flex-start;" id="storageUsageRow">
+                        <i class="fa-solid fa-database"></i>
+                        <span id="storageUsageText" style="font-weight:400; color:var(--text-sub); font-size:var(--text-xs);">集計中…</span>
+                    </div>
                     <div class="menu-sep"></div>
                     <button class="menu-item is-danger" onclick="closeMenus(); clearDatabase();">
                         <i class="fa-solid fa-trash-can"></i>
@@ -159,11 +165,11 @@
                         </button>
                         <div class="menu-sep"></div>
                         <div class="menu-label">データ</div>
-                        <button class="menu-item" onclick="closeMenus(); exportToJSON();">
-                            <i class="fa-solid fa-file-arrow-down"></i><span>JSONに書き出す</span>
+                        <button class="menu-item" onclick="closeMenus(); exportToZIP();">
+                            <i class="fa-solid fa-file-zipper"></i><span>ZIPでバックアップ</span>
                         </button>
                         <button class="menu-item" onclick="closeMenus(); document.getElementById('importFile').click();">
-                            <i class="fa-solid fa-file-arrow-up"></i><span>JSONから読み込む</span>
+                            <i class="fa-solid fa-file-arrow-up"></i><span>バックアップから復元</span>
                         </button>
                         <div class="menu-sep"></div>
                         <button class="menu-item" onclick="closeMenus(); openKeyHelp();">
@@ -171,7 +177,7 @@
                         </button>
                     </div>
                 </div>
-                <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importFromJSON(event)">
+                <input type="file" id="importFile" accept=".zip,.json" style="display:none;" onchange="importFromJSON(event)">
 
                 <!-- 主要動線：1画面に1つだけの primary -->
                 <button class="btn btn-primary btn-sm" onclick="createNewAsset()" id="btnCreateAsset" title="新しい資産を登録します">
@@ -775,6 +781,8 @@
 <!-- JavaScript Modules - 依存関係を考慮した読み込み順 -->
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/zip.js"></script>
+<script src="js/image-store.js"></script>
 <script src="js/suggest.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/navigation.js"></script>

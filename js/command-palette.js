@@ -30,8 +30,8 @@ function getPaletteCommands() {
         { id: 'view-cal',   icon: 'fa-calendar',        title: 'カレンダー表示に切り替える', hint: '3', run: () => { showAssets({ keepFilter: true }); switchAssetView('calendar'); } },
         { id: 'master',     icon: 'fa-sitemap',         title: 'マスタ・タグ設定を開く', run: () => openMasterModal() },
         { id: 'columns',    icon: 'fa-table-columns',   title: 'リストの列を設定',       run: () => openListSettingsModal() },
-        { id: 'export',     icon: 'fa-file-arrow-down', title: 'JSONに書き出す',        run: () => exportToJSON() },
-        { id: 'import',     icon: 'fa-file-arrow-up',   title: 'JSONから読み込む',      run: () => document.getElementById('importFile').click() },
+        { id: 'export',     icon: 'fa-file-zipper',     title: 'ZIPでバックアップ',      run: () => exportToZIP() },
+        { id: 'import',     icon: 'fa-file-arrow-up',   title: 'バックアップから復元',   run: () => document.getElementById('importFile').click() },
         { id: 'clear',      icon: 'fa-rotate-left',     title: '絞り込みをすべて解除',   run: () => { showAssets({ keepFilter: true }); clearAllFilters(); } },
         { id: 'help',       icon: 'fa-keyboard',        title: 'ショートカット一覧',    hint: '?',     run: () => openKeyHelp() }
     ];
