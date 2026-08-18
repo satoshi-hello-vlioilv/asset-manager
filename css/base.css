@@ -3,139 +3,181 @@
  * デザイントークン（CSS変数）と共通コンポーネント
  *
  * ─────────────────────────────────────────────────────────────
- * 設計方針（認知心理学・色彩心理学）
+ * 配色の考え方 —「落ち着いていて、飽きが来ない」
  * ─────────────────────────────────────────────────────────────
- * 1. 色は「意味」を持つときだけ使う（色の意味の希釈を防ぐ）
- *    UIの約9割はニュートラル（slate系）で構成し、彩度の高い色は
- *    「状態」と「次に取るべき行動」だけに割り当てる。
- *    → 画面を見た瞬間に、注意を向けるべき箇所が1〜2箇所に絞られる。
+ * 1. 彩度を抑えた深い色で構成する
+ *    明るく鮮やかな色は最初は目を引くが、毎日8時間見る道具では疲れる。
+ *    アクセントは「スチールネイビー」（深く彩度を落とした青）に統一し、
+ *    状態色も一段深いトーンで揃えることで、画面全体の刺激量を下げている。
  *
- * 2. 状態色の割り当ては一般的な色連想に従う（学習コストゼロ）
- *    緑=正常/安全, 琥珀=注意/進行中, 赤=停止/危険, 灰=終了/対象外, 青=情報/操作
+ * 2. ニュートラルはわずかに青みを含むグレー
+ *    完全な無彩色は硬く冷たい印象になり、暖色グレーは古びて見える。
+ *    ごく僅かに青を含ませることで、白いカードが清潔に見え、
+ *    ネイビーのアクセントとも同じ色相圏でまとまる。
  *
- * 3. 寒色寄りのニュートラル背景（#f6f8fb）
- *    純白より輝度が低く長時間の閲覧でも疲れにくい。かつ白いカードが
- *    「浮いて」見えるため、情報のまとまり（ゲシュタルト）が知覚しやすい。
+ * 3. 色は「意味」を持つときだけ使う
+ *    UIの約9割はニュートラル。彩度の高い色は「状態」と「次の行動」だけに使う。
+ *    緑=正常 / 琥珀=注意 / 赤=停止 / 灰=対象外 / ネイビー=操作・情報
  *
- * 4. 階層は「色の濃さ」ではなく「サイズ・余白・影」で表現する
- *    タイポグラフィと余白のスケールを固定し、比較を容易にする。
+ * 4. 階層は色の濃さではなく、サイズ・余白・境界線で表現する
+ *    影は最小限（浮くのは本当に浮いている要素だけ）。
+ *
  * ─────────────────────────────────────────────────────────────
+ * 情報密度 — 既定は「コンパクト」
+ * ─────────────────────────────────────────────────────────────
+ * 一覧で一度に把握できる件数が多いほど、スクロールと記憶の負担が減る。
+ * 余白・行高・文字サイズを密度トークンにまとめ、
+ * <html data-density="compact|cozy"> で切り替えられるようにしている。
  */
 
 :root {
     /* ============================================================
-       1. プリミティブ・パレット（意味を持たない生の色）
+       1. プリミティブ・パレット
        ============================================================ */
-    --slate-50:  #f8fafc;
-    --slate-100: #f1f5f9;
-    --slate-200: #e2e8f0;
-    --slate-300: #cbd5e1;
-    --slate-400: #94a3b8;
-    --slate-500: #64748b;
-    --slate-600: #475569;
-    --slate-700: #334155;
-    --slate-800: #1e293b;
-    --slate-900: #0f172a;
 
-    --blue-50:  #eff5ff;
-    --blue-100: #dbe8fe;
-    --blue-200: #bfd6fe;
-    --blue-300: #93b9fd;
-    --blue-500: #3b74f6;
-    --blue-600: #2559eb;
-    --blue-700: #1c46d8;
-    --blue-800: #1d3bae;
+    /* ニュートラル（わずかに青みを含むグレー） */
+    --n-0:   #ffffff;
+    --n-25:  #fbfcfd;
+    --n-50:  #f6f8fa;
+    --n-100: #eef1f5;
+    --n-150: #e6eaef;
+    --n-200: #dce1e8;
+    --n-300: #c3cad4;
+    --n-400: #97a1ae;
+    --n-500: #6c7787;
+    --n-600: #4e5867;
+    --n-700: #3a4350;
+    --n-800: #272e39;
+    --n-900: #171c24;
 
-    --green-50:  #ecfdf5;
-    --green-100: #d1fae5;
-    --green-200: #a7f3d0;
-    --green-600: #059669;
-    --green-700: #047857;
-    --green-800: #065f46;
+    /* スチールネイビー（操作色） */
+    --p-25:  #f5f8fc;
+    --p-50:  #eaf1f9;
+    --p-100: #d6e4f2;
+    --p-200: #b6cde6;
+    --p-300: #8badd4;
+    --p-400: #5886b8;
+    --p-500: #35659c;
+    --p-600: #275388;   /* primary */
+    --p-700: #1f4370;
+    --p-800: #1b385c;
+    --p-900: #172e4a;
 
-    --amber-50:  #fffbeb;
-    --amber-100: #fef3c7;
-    --amber-200: #fde68a;
-    --amber-500: #f59e0b;
-    --amber-600: #d97706;
-    --amber-700: #b45309;
+    /* 状態色（いずれも一段深いトーンで統一） */
+    --g-50:  #eef6f1;
+    --g-100: #d6ebde;
+    --g-200: #aed8c0;
+    --g-600: #1c7a4c;
+    --g-700: #15613c;
+    --g-800: #10492d;
 
-    --red-50:  #fef2f2;
-    --red-100: #fee2e2;
-    --red-200: #fecaca;
-    --red-500: #ef4444;
-    --red-600: #dc2626;
-    --red-700: #b91c1c;
+    --a-50:  #fdf6eb;
+    --a-100: #f8e9c9;
+    --a-200: #eed49b;
+    --a-500: #c98a12;
+    --a-600: #a86a09;
+    --a-700: #8a5308;
+
+    --r-50:  #fdf3f2;
+    --r-100: #fae3e1;
+    --r-200: #f2c3bf;
+    --r-500: #c94a3d;
+    --r-600: #b03024;
+    --r-700: #8f251b;
+
+    /* 旧トークン名の別名（既存スタイルとの互換のため残す） */
+    --slate-50: var(--n-50);    --slate-100: var(--n-100);
+    --slate-200: var(--n-200);  --slate-300: var(--n-300);
+    --slate-400: var(--n-400);  --slate-500: var(--n-500);
+    --slate-600: var(--n-600);  --slate-700: var(--n-700);
+    --slate-800: var(--n-800);  --slate-900: var(--n-900);
+    --blue-50: var(--p-50);     --blue-100: var(--p-100);
+    --blue-200: var(--p-200);   --blue-300: var(--p-300);
+    --blue-500: var(--p-500);   --blue-600: var(--p-600);
+    --blue-700: var(--p-700);   --blue-800: var(--p-800);
+    --green-50: var(--g-50);    --green-100: var(--g-100);
+    --green-200: var(--g-200);  --green-600: var(--g-600);
+    --green-700: var(--g-700);  --green-800: var(--g-800);
+    --amber-50: var(--a-50);    --amber-100: var(--a-100);
+    --amber-200: var(--a-200);  --amber-500: var(--a-500);
+    --amber-600: var(--a-600);  --amber-700: var(--a-700);
+    --red-50: var(--r-50);      --red-100: var(--r-100);
+    --red-200: var(--r-200);    --red-500: var(--r-500);
+    --red-600: var(--r-600);    --red-700: var(--r-700);
 
     /* ============================================================
-       2. セマンティック・トークン（役割で参照する）
+       2. セマンティック・トークン
        ============================================================ */
 
-    /* 面（surface）— 下から順に重なる */
-    --canvas:         #f6f8fb;  /* アプリの地。わずかに青みのある低輝度グレー */
-    --surface:        #ffffff;  /* カード・パネル */
-    --surface-sunken: var(--slate-50);   /* 入力枠の背景・くぼんだ領域 */
-    --surface-muted:  var(--slate-100);  /* トグル台座・区切り帯 */
-    --surface-hover:  var(--slate-50);
+    /* 面 */
+    --canvas:         var(--n-50);
+    --surface:        var(--n-0);
+    --surface-sunken: var(--n-50);
+    --surface-muted:  var(--n-100);
+    --surface-hover:  var(--n-50);
+    --surface-active: var(--p-50);
 
     /* 線 */
-    --border:        var(--slate-200);
-    --border-strong: var(--slate-300);
-    --border-subtle: #eef2f7;
+    --border:        var(--n-200);
+    --border-strong: var(--n-300);
+    --border-subtle: var(--n-150);
 
-    /* 文字（4段階だけ。これ以上は増やさない） */
-    --text-strong: var(--slate-900); /* 見出し・数値 */
-    --text:        var(--slate-800); /* 本文 */
-    --text-main:   var(--slate-800); /* 旧名エイリアス */
-    --text-sub:    var(--slate-500); /* ラベル・補助 */
-    --text-faint:  var(--slate-400); /* 非活性・プレースホルダ */
+    /* 文字（4段階） */
+    --text-strong: var(--n-900);
+    --text:        var(--n-800);
+    --text-main:   var(--n-800);
+    --text-sub:    var(--n-500);
+    --text-faint:  var(--n-400);
 
-    /* 操作色（青＝信頼・冷静。主要動線のみに使う） */
-    --primary:        var(--blue-600);
-    --primary-hover:  var(--blue-700);
-    --primary-dark:   var(--blue-800);
-    --primary-bg:     var(--blue-50);
-    --primary-border: var(--blue-200);
-    --primary-ring:   rgba(37, 89, 235, 0.16);
-    --secondary:      var(--slate-600);
+    /* 操作色 */
+    --primary:        var(--p-600);
+    --primary-hover:  var(--p-700);
+    --primary-dark:   var(--p-800);
+    --primary-bg:     var(--p-50);
+    --primary-border: var(--p-200);
+    --primary-ring:   rgba(39, 83, 136, 0.18);
+    --secondary:      var(--n-600);
 
-    /* 状態色（意味と1対1で対応） */
-    --success:    var(--green-600);
-    --success-bg: var(--green-50);
-    --success-fg: var(--green-800);
-    --warning:    var(--amber-600);
-    --warning-bg: var(--amber-50);
-    --warning-fg: var(--amber-700);
-    --danger:     var(--red-600);
-    --danger-bg:  var(--red-50);
-    --danger-fg:  var(--red-700);
-    --info:       var(--blue-600);
-    --info-bg:    var(--blue-50);
-    --info-fg:    var(--blue-800);
-    --neutral-bg: var(--slate-100);
-    --neutral-fg: var(--slate-600);
+    /* 状態色 */
+    --success:    var(--g-600);
+    --success-bg: var(--g-50);
+    --success-fg: var(--g-800);
+    --warning:    var(--a-600);
+    --warning-bg: var(--a-50);
+    --warning-fg: var(--a-700);
+    --danger:     var(--r-600);
+    --danger-bg:  var(--r-50);
+    --danger-fg:  var(--r-700);
+    --info:       var(--p-600);
+    --info-bg:    var(--p-50);
+    --info-fg:    var(--p-800);
+    --neutral-bg: var(--n-100);
+    --neutral-fg: var(--n-600);
 
-    /* 絞り込み中であることを示す色（サイドバー） */
-    --filter-active-bg:   var(--blue-600);
+    /* 絞り込み中を示す色 */
+    --filter-active-bg:   var(--p-600);
     --filter-active-text: #ffffff;
 
     /* ============================================================
-       3. タイポグラフィ・スケール（6段階に固定）
+       3. タイポグラフィ
        ============================================================ */
     --font-sans: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-mono: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
 
-    --text-2xs: 0.6875rem; /* 11px タグ・補足 */
-    --text-xs:  0.75rem;   /* 12px ラベル */
-    --text-sm:  0.8125rem; /* 13px 補助テキスト */
-    --text-base:0.875rem;  /* 14px 本文（画面密度を優先） */
-    --text-md:  1rem;      /* 16px 小見出し */
-    --text-lg:  1.125rem;  /* 18px 見出し */
-    --text-xl:  1.5rem;    /* 24px セクション見出し */
-    --text-2xl: 2rem;      /* 32px KPI数値 */
+    --text-2xs: 0.6875rem; /* 11px */
+    --text-xs:  0.75rem;   /* 12px */
+    --text-sm:  0.8125rem; /* 13px */
+    --text-base:0.8125rem; /* 13px — 密度優先の本文サイズ */
+    --text-md:  0.9375rem; /* 15px */
+    --text-lg:  1.0625rem; /* 17px */
+    --text-xl:  1.3125rem; /* 21px */
+    --text-2xl: 1.75rem;   /* 28px */
+
+    --leading-tight: 1.35;
+    --leading: 1.55;
 
     /* ============================================================
-       4. 余白スケール（4px基準。中間値を作らない）
+       4. 余白（4px基準）
        ============================================================ */
     --space-1: 4px;
     --space-2: 8px;
@@ -147,31 +189,41 @@
     --space-10: 40px;
 
     /* ============================================================
-       5. 形・影・動き
+       5. 密度トークン（既定はコンパクト）
        ============================================================ */
-    --radius-sm: 6px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
-    --radius-xl: 16px;
-    --radius-full: 999px;
-
-    /* 影は「浮き上がりの高さ」を表す。多用しない */
-    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-    --shadow-md: 0 2px 4px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.06);
-    --shadow-lg: 0 4px 8px rgba(15, 23, 42, 0.06), 0 12px 28px rgba(15, 23, 42, 0.10);
-    --shadow-xl: 0 8px 16px rgba(15, 23, 42, 0.08), 0 24px 48px rgba(15, 23, 42, 0.16);
-
-    --ease: cubic-bezier(0.4, 0, 0.2, 1);
-    --dur-fast: 0.12s;
-    --dur: 0.18s;
-    --dur-slow: 0.28s;
+    --d-row-py:    6px;   /* テーブル行の上下パディング */
+    --d-row-px:    12px;  /* テーブル行の左右パディング */
+    --d-card-pad:  14px;  /* カード・パネルの内側 */
+    --d-nav-py:    6px;   /* サイドバー項目の上下 */
+    --d-content:   16px;  /* コンテンツ領域の外周 */
+    --d-stack:     12px;  /* セクション間の縦の間隔 */
+    --d-ctl-h:     30px;  /* 入力・ボタンの標準高さ */
 
     /* ============================================================
-       6. レイアウト寸法・重なり順
+       6. 形・影・動き
        ============================================================ */
-    --header-height: 60px;
-    --contextbar-height: 46px;
-    --sidebar-width: 272px;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 10px;
+    --radius-xl: 14px;
+    --radius-full: 999px;
+
+    --shadow-sm: 0 1px 2px rgba(23, 28, 36, 0.06);
+    --shadow-md: 0 1px 2px rgba(23, 28, 36, 0.06), 0 4px 10px rgba(23, 28, 36, 0.07);
+    --shadow-lg: 0 2px 6px rgba(23, 28, 36, 0.07), 0 12px 24px rgba(23, 28, 36, 0.10);
+    --shadow-xl: 0 8px 16px rgba(23, 28, 36, 0.08), 0 24px 48px rgba(23, 28, 36, 0.16);
+
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --dur-fast: 0.1s;
+    --dur: 0.15s;
+    --dur-slow: 0.24s;
+
+    /* ============================================================
+       7. レイアウト寸法・重なり順
+       ============================================================ */
+    --header-height: 52px;
+    --contextbar-height: 38px;
+    --sidebar-width: 250px;
 
     --z-sticky: 10;
     --z-sidebar: 20;
@@ -181,6 +233,21 @@
     --z-popover: 200;
     --z-toast: 1000;
     --z-palette: 1100;
+}
+
+/* ゆったり表示（本文と余白を一段広げる） */
+html[data-density="cozy"] {
+    --text-base: 0.875rem;
+    --text-sm:   0.8125rem;
+    --d-row-py:   10px;
+    --d-row-px:   16px;
+    --d-card-pad: 20px;
+    --d-nav-py:    9px;
+    --d-content:  24px;
+    --d-stack:    20px;
+    --d-ctl-h:    36px;
+    --header-height: 58px;
+    --contextbar-height: 44px;
 }
 
 /* ============================================================
@@ -193,7 +260,7 @@ html { -webkit-text-size-adjust: 100%; }
 body {
     font-family: var(--font-sans);
     font-size: var(--text-base);
-    line-height: 1.6;
+    line-height: var(--leading);
     margin: 0;
     background: var(--canvas);
     color: var(--text);
@@ -204,37 +271,34 @@ body {
     text-rendering: optimizeLegibility;
 }
 
-/* 見出しの行間は本文より詰める（視覚的なかたまり感を出す） */
-h1, h2, h3, h4, h5 { line-height: 1.35; color: var(--text-strong); font-weight: 700; }
+h1, h2, h3, h4, h5 { line-height: var(--leading-tight); color: var(--text-strong); font-weight: 650; }
 
 /* 数値は等幅（桁が揃うと比較が一瞬で終わる） */
-.tabular, .stat-value, .stat-card-value { font-variant-numeric: tabular-nums; }
+.tabular, .stat-value, .stat-card-value, td, .count-pill { font-variant-numeric: tabular-nums; }
 
-/* テキスト選択はコンテンツ領域と入力欄のみ許可
-   （グラフやドラッグ操作系UIでは誤選択を防ぐため無効のまま） */
+/* テキスト選択はコンテンツ領域と入力欄のみ許可 */
 body { user-select: none; }
 input, textarea, [contenteditable="true"],
 .tab-content-area, .content-scroll, .cf-right-pane-body, .selectable { user-select: text; }
 
-/* キーボード操作時のみフォーカスリングを表示（アクセシビリティ） */
+/* キーボード操作時のみフォーカスリングを表示 */
 * { outline: none; }
 :focus-visible {
     outline: 2px solid var(--primary);
-    outline-offset: 2px;
+    outline-offset: 1px;
     border-radius: var(--radius-sm);
 }
 
-/* スクロールバー（主張しすぎない） */
-* { scrollbar-width: thin; scrollbar-color: var(--slate-300) transparent; }
+/* スクロールバー */
+* { scrollbar-width: thin; scrollbar-color: var(--n-300) transparent; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb {
-    background: var(--slate-300); border-radius: var(--radius-full);
+    background: var(--n-300); border-radius: var(--radius-full);
     border: 3px solid transparent; background-clip: content-box;
 }
-*::-webkit-scrollbar-thumb:hover { background: var(--slate-400); background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--n-400); background-clip: content-box; }
 
-/* 「動きを減らす」設定を尊重する */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;
@@ -246,29 +310,24 @@ input, textarea, [contenteditable="true"],
 
 /* ============================================================
    ボタン
-   種類は4つだけ：primary（主行動）/ outline（副次）/ ghost（軽い操作）
-   / danger（破壊的）。1画面のprimaryは原則1つ。
    ============================================================ */
 .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
-    padding: 8px 14px; border-radius: var(--radius-md);
-    font-family: inherit; font-weight: 600; font-size: var(--text-base); line-height: 1.2;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: var(--d-ctl-h); padding: 0 11px; border-radius: var(--radius-md);
+    font-family: inherit; font-weight: 600; font-size: var(--text-base); line-height: 1;
     cursor: pointer; white-space: nowrap; border: 1px solid transparent;
     transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
-                color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur-fast) var(--ease);
+                color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
-.btn:active { transform: translateY(1px); }
-.btn:disabled, .btn[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: 0.45; pointer-events: none; }
 .btn i { font-size: 0.95em; }
 
-.btn-sm { padding: 6px 10px; font-size: var(--text-sm); gap: 6px; }
-.btn-lg { padding: 11px 20px; font-size: var(--text-md); }
+.btn-sm { height: calc(var(--d-ctl-h) - 4px); padding: 0 9px; font-size: var(--text-xs); gap: 5px; }
+.btn-lg { height: calc(var(--d-ctl-h) + 8px); padding: 0 18px; font-size: var(--text-md); }
 
-.btn-primary {
-    background: var(--primary); color: #fff;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(37, 89, 235, 0.30);
-}
-.btn-primary:hover { background: var(--primary-hover); box-shadow: 0 2px 6px rgba(37, 89, 235, 0.35); }
+.btn-primary { background: var(--primary); color: #fff; box-shadow: var(--shadow-sm); }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:active { background: var(--primary-dark); }
 
 .btn-outline { background: var(--surface); border-color: var(--border); color: var(--text); }
 .btn-outline:hover { background: var(--surface-hover); border-color: var(--border-strong); }
@@ -277,28 +336,24 @@ input, textarea, [contenteditable="true"],
 .btn-ghost:hover { background: var(--surface-muted); color: var(--text); }
 
 .btn-soft { background: var(--primary-bg); color: var(--primary-dark); border-color: var(--primary-border); }
-.btn-soft:hover { background: var(--blue-100); }
+.btn-soft:hover { background: var(--p-100); }
 
 .btn-danger { background: var(--danger); color: #fff; }
-.btn-danger:hover { background: var(--red-700); }
+.btn-danger:hover { background: var(--r-700); }
 .btn-danger-ghost { color: var(--danger); background: transparent; }
 .btn-danger-ghost:hover { background: var(--danger-bg); }
 
-.btn-icon-only { width: 34px; height: 34px; padding: 0; border-radius: var(--radius-md); }
-.btn-icon-only.btn-sm { width: 30px; height: 30px; }
-
-/* 主要動線のボタンだけ、静かに存在を主張させる（Ctrl+K の発見性向上と同じ狙い） */
-.btn .kbd { margin-left: var(--space-1); }
+.btn-icon-only { width: var(--d-ctl-h); padding: 0; }
+.btn-icon-only.btn-sm { width: calc(var(--d-ctl-h) - 4px); }
 
 /* ============================================================
-   セグメンテッド・コントロール（表示切替）
-   トグル群は「今どれが選ばれているか」を面で示す
+   セグメンテッド・コントロール
    ============================================================ */
 .segmented {
-    display: inline-flex; gap: 2px; padding: 3px;
+    display: inline-flex; gap: 1px; padding: 2px;
     background: var(--surface-muted); border-radius: var(--radius-md);
 }
-.segmented .btn { border-radius: var(--radius-sm); box-shadow: none; }
+.segmented .btn { border-radius: var(--radius-sm); box-shadow: none; height: calc(var(--d-ctl-h) - 6px); }
 .toggle-btn-active {
     background: var(--surface); color: var(--primary);
     box-shadow: var(--shadow-sm); border-color: transparent;
@@ -306,44 +361,43 @@ input, textarea, [contenteditable="true"],
 .toggle-btn-active:hover { background: var(--surface); color: var(--primary-hover); }
 .toggle-btn-active i { color: inherit; }
 .toggle-btn-inactive { background: transparent; color: var(--text-sub); box-shadow: none; border-color: transparent; }
-.toggle-btn-inactive:hover { background: rgba(255, 255, 255, 0.65); color: var(--text); }
+.toggle-btn-inactive:hover { background: rgba(255, 255, 255, 0.7); color: var(--text); }
 
 /* ============================================================
-   バッジ（状態表示）
-   彩度を抑えた背景 + 濃い文字色で、小さくても判読できる
+   バッジ
    ============================================================ */
 .badge {
-    font-size: var(--text-2xs); padding: 3px 9px; border-radius: var(--radius-full);
-    font-weight: 600; line-height: 1.4; letter-spacing: 0.01em;
+    font-size: var(--text-2xs); padding: 1px 7px; border-radius: var(--radius-sm);
+    font-weight: 600; line-height: 1.5; letter-spacing: 0.01em;
     display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+    border: 1px solid transparent;
 }
-.badge-blue   { background: var(--info-bg);    color: var(--info-fg); }
-.badge-green  { background: var(--success-bg); color: var(--success-fg); }
-.badge-red    { background: var(--danger-bg);  color: var(--danger-fg); }
-.badge-orange { background: var(--warning-bg); color: var(--warning-fg); }
-.badge-gray   { background: var(--neutral-bg); color: var(--neutral-fg); }
+.badge-blue   { background: var(--info-bg);    color: var(--info-fg);    border-color: var(--p-100); }
+.badge-green  { background: var(--success-bg); color: var(--success-fg); border-color: var(--g-100); }
+.badge-red    { background: var(--danger-bg);  color: var(--danger-fg);  border-color: var(--r-100); }
+.badge-orange { background: var(--warning-bg); color: var(--warning-fg); border-color: var(--a-100); }
+.badge-gray   { background: var(--neutral-bg); color: var(--neutral-fg); border-color: var(--n-150); }
 
-/* 状態バッジの先頭に色ドットを付けると、色覚特性に依らず区別しやすい */
 .badge-dot::before {
-    content: ''; width: 6px; height: 6px; border-radius: 50%;
-    background: currentColor; opacity: 0.75; flex-shrink: 0;
+    content: ''; width: 5px; height: 5px; border-radius: 50%;
+    background: currentColor; opacity: 0.8; flex-shrink: 0;
 }
 
-/* 件数カウンタ（数値だけの小さなバッジ） */
+/* 件数カウンタ */
 .count-pill {
-    font-size: var(--text-2xs); font-weight: 600; font-variant-numeric: tabular-nums;
-    padding: 1px 7px; border-radius: var(--radius-full);
-    background: var(--surface-muted); color: var(--text-sub); line-height: 1.6;
+    font-size: var(--text-2xs); font-weight: 600;
+    padding: 0 6px; border-radius: var(--radius-sm); min-width: 18px; text-align: center;
+    background: var(--surface-muted); color: var(--text-sub); line-height: 17px;
+    display: inline-block;
 }
 
 /* ============================================================
    キーボードショートカット表記
-   「思い出させない」ため、操作の近くに常時表示する
    ============================================================ */
 .kbd {
     display: inline-flex; align-items: center; justify-content: center;
-    min-width: 20px; height: 20px; padding: 0 5px;
-    font-family: var(--font-sans); font-size: var(--text-2xs); font-weight: 600;
+    min-width: 17px; height: 17px; padding: 0 4px;
+    font-family: var(--font-sans); font-size: 10px; font-weight: 600;
     color: var(--text-sub); background: var(--surface);
     border: 1px solid var(--border); border-bottom-width: 2px;
     border-radius: var(--radius-sm); white-space: nowrap;
@@ -353,7 +407,7 @@ input, textarea, [contenteditable="true"],
    入力欄
    ============================================================ */
 .input {
-    width: 100%; padding: 9px 12px;
+    width: 100%; height: var(--d-ctl-h); padding: 0 9px;
     border: 1px solid var(--border); border-radius: var(--radius-md);
     font-family: inherit; font-size: var(--text-base); color: var(--text);
     background: var(--surface);
@@ -362,60 +416,81 @@ input, textarea, [contenteditable="true"],
 .input::placeholder { color: var(--text-faint); }
 .input:hover { border-color: var(--border-strong); }
 .input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-ring); }
-textarea.input { resize: vertical; min-height: 92px; line-height: 1.65; }
+textarea.input { height: auto; padding: 7px 9px; resize: vertical; min-height: 72px; line-height: var(--leading); }
+select.input { padding: 0 6px; cursor: pointer; }
 
-/* 値が変更された入力欄（保存前の差分を可視化） */
+/* 変更された入力欄（保存前の差分を可視化） */
 .input.is-changed, .is-changed {
-    background: var(--amber-50);
-    box-shadow: inset 3px 0 0 var(--amber-500);
+    background: var(--a-50);
+    box-shadow: inset 2px 0 0 var(--a-500);
 }
 
-/* --- フィールド（ラベル + 入力 + 補足）の標準構造 --- */
-.field { display: flex; flex-direction: column; gap: 6px; }
+/* --- フィールド（ラベル + 入力 + 補足） --- */
+.field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .field-label {
-    font-size: var(--text-xs); font-weight: 700; color: var(--text-sub);
-    letter-spacing: 0.02em; display: flex; align-items: center; gap: 6px;
+    font-size: var(--text-xs); font-weight: 600; color: var(--text-sub);
+    display: flex; align-items: center; gap: 5px;
 }
-.field-hint { font-size: var(--text-xs); color: var(--text-faint); line-height: 1.5; }
+.field-hint { font-size: var(--text-xs); color: var(--text-faint); line-height: 1.45; }
 
-/* --- Form Group (モーダル内のフォーム構造) --- */
-.form-group { margin-bottom: var(--space-4); }
+/* --- Form Group（モーダル内のフォーム構造） --- */
+.form-group { margin-bottom: var(--space-3); }
 .form-group label {
-    display: block; font-weight: 600; font-size: var(--text-sm);
-    color: var(--text); margin-bottom: 6px; line-height: 1.4;
+    display: block; font-weight: 600; font-size: var(--text-xs);
+    color: var(--text-sub); margin-bottom: 4px; line-height: 1.4;
 }
 .form-group label input[type="checkbox"] { margin-right: 6px; vertical-align: middle; }
-.form-group small { display: block; margin-top: 5px; font-size: var(--text-xs); color: var(--text-sub); }
+.form-group small { display: block; margin-top: 4px; font-size: var(--text-xs); color: var(--text-faint); }
 .form-group input:not([type="checkbox"]),
 .form-group select,
 .form-group textarea {
-    width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-md);
-    font-size: var(--text-base); font-family: inherit; background: var(--surface);
+    width: 100%; padding: 6px 9px; border: 1px solid var(--border); border-radius: var(--radius-md);
+    font-size: var(--text-base); font-family: inherit; background: var(--surface); color: var(--text);
     transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 .form-group input:not([type="checkbox"]):focus,
 .form-group select:focus,
 .form-group textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-ring); }
-.form-group textarea { resize: vertical; min-height: 90px; line-height: 1.65; }
+.form-group textarea { resize: vertical; min-height: 72px; line-height: var(--leading); }
 .form-group select { appearance: auto; cursor: pointer; }
 
-/* チェックボックス・ラジオの当たり判定を広く取る（Fittsの法則） */
+/* チェックボックスの当たり判定を広く取る（Fittsの法則） */
 .choice {
-    display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
-    padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius-md);
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    padding: 4px 9px; border: 1px solid var(--border); border-radius: var(--radius-md);
     background: var(--surface); font-size: var(--text-base); font-weight: 500;
-    transition: all var(--dur) var(--ease);
+    transition: all var(--dur) var(--ease); line-height: 1.6;
 }
 .choice:hover { border-color: var(--border-strong); background: var(--surface-hover); }
-.choice input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); margin: 0; }
+.choice input { width: 14px; height: 14px; cursor: pointer; accent-color: var(--primary); margin: 0; }
 .choice:has(input:checked) { border-color: var(--primary); background: var(--primary-bg); color: var(--primary-dark); font-weight: 600; }
+
+/* 押すだけで値が入る補助チップ（サジェスト・プリセット） */
+.suggest-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px; border-radius: var(--radius-full);
+    border: 1px dashed var(--border-strong); background: var(--surface);
+    color: var(--text-sub); font-size: var(--text-xs); font-weight: 500;
+    cursor: pointer; white-space: nowrap; font-family: inherit;
+    transition: all var(--dur) var(--ease);
+}
+.suggest-chip:hover {
+    border-style: solid; border-color: var(--primary);
+    background: var(--primary-bg); color: var(--primary-dark);
+}
+.suggest-chip i { font-size: 0.7rem; opacity: 0.65; }
+.suggest-row {
+    display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+    font-size: var(--text-xs); color: var(--text-faint);
+}
+.suggest-row-label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 
 /* --- Close Button --- */
 .btn-close {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 32px; height: 32px; border: none; background: transparent;
+    width: 28px; height: 28px; border: none; background: transparent;
     border-radius: var(--radius-md); cursor: pointer; color: var(--text-sub);
-    font-size: var(--text-md); transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+    font-size: var(--text-base); transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .btn-close:hover { background: var(--surface-muted); color: var(--text); }
 
@@ -426,36 +501,34 @@ textarea.input { resize: vertical; min-height: 92px; line-height: 1.65; }
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius-lg); overflow: hidden;
 }
-.panel-pad { padding: var(--space-5); }
+.panel-pad { padding: var(--d-card-pad); }
 
 .section-title {
-    display: flex; align-items: center; gap: var(--space-2);
-    font-size: var(--text-md); font-weight: 700; color: var(--text-strong); margin: 0;
+    display: flex; align-items: center; gap: 6px;
+    font-size: var(--text-md); font-weight: 650; color: var(--text-strong); margin: 0;
 }
-.section-title i { color: var(--text-faint); font-size: 0.9em; }
+.section-title i { color: var(--text-faint); font-size: 0.85em; }
 .section-head {
     display: flex; align-items: center; justify-content: space-between;
-    gap: var(--space-3); margin-bottom: var(--space-3);
+    gap: var(--space-3); margin-bottom: var(--space-2);
 }
-.section-desc { font-size: var(--text-sm); color: var(--text-sub); margin: 4px 0 0 0; }
+.section-desc { font-size: var(--text-xs); color: var(--text-sub); margin: 2px 0 0 0; }
 
 /* 空状態：必ず「次に何をすればよいか」を提示する */
-.empty-state { padding: var(--space-10) var(--space-5); text-align: center; }
-.empty-state-icon {
-    font-size: 2.5rem; color: var(--slate-300); margin-bottom: var(--space-3); display: block;
-}
-.empty-state-title { font-size: var(--text-md); font-weight: 700; color: var(--text); margin-bottom: 6px; }
-.empty-state-desc { font-size: var(--text-sm); color: var(--text-sub); margin-bottom: var(--space-5); }
+.empty-state { padding: var(--space-8) var(--space-5); text-align: center; }
+.empty-state-icon { font-size: 2rem; color: var(--n-300); margin-bottom: var(--space-2); display: block; }
+.empty-state-title { font-size: var(--text-md); font-weight: 650; color: var(--text); margin-bottom: 4px; }
+.empty-state-desc { font-size: var(--text-sm); color: var(--text-sub); margin-bottom: var(--space-4); }
 
-/* --- Type-Specific Options Section (データ型別オプション) --- */
+/* --- データ型別オプション --- */
 .type-options-section {
     background: var(--surface-sunken); border: 1px solid var(--border); border-radius: var(--radius-md);
-    padding: var(--space-4); margin-top: -6px; margin-bottom: var(--space-1);
+    padding: var(--space-3); margin-top: -4px; margin-bottom: var(--space-1);
 }
 .type-options-section-header {
-    display: flex; align-items: center; gap: var(--space-2);
-    font-size: var(--text-xs); font-weight: 700; color: var(--text-sub);
-    margin-bottom: var(--space-3); letter-spacing: 0.04em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 6px;
+    font-size: var(--text-2xs); font-weight: 700; color: var(--text-sub);
+    margin-bottom: var(--space-2); letter-spacing: 0.05em; text-transform: uppercase;
 }
-.type-options-section-header i { color: var(--primary); font-size: 0.85rem; }
+.type-options-section-header i { color: var(--primary); font-size: 0.8rem; }
 .type-options-section .form-group:last-child { margin-bottom: 0; }

@@ -125,9 +125,7 @@ async function receivePastedImages(files) {
 
 /** 画像タブへ切り替える（貼り付け結果をその場で確認できるように） */
 function focusImagesTab() {
-    const tabEl = Array.from(document.querySelectorAll('#assetModal .tabs .tab'))
-        .find(t => t.getAttribute('onclick') && t.getAttribute('onclick').includes('tabImages'));
-    if(tabEl) switchTab(tabEl, 'tabImages');
+    openModalTab('tabImages');
 }
 
 /** 貼り付けが効いたことを画面中央で一瞬だけ知らせる */

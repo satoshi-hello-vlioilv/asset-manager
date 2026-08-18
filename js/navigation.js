@@ -34,6 +34,28 @@ function buildAssetCountIndex() {
 }
 
 /**
+ * よく使う絞り込みタグを推定する
+ *
+ * 「絞り込みに使った実績」と「実際に付与されている件数」の両方を見る。
+ * 使い始めの実績が無い段階でも、資産が多く紐づくタグが自然に上位に来るため、
+ * 最初から近道として機能する。
+ * @param {number} limit
+ */
+function getQuickAccessTags(limit = 6) {
+    const counts = getTagAttachCounts();
+    const scored = tags
+        .map(t => ({
+            tag: t,
+            // 明示的に絞り込んだ実績を強く重み付けする
+            score: usageScore('tags', t.id) * 3 + (counts.get(t.id) || 0)
+        }))
+        .filter(x => x.score > 0)
+        .sort((a, b) => b.score - a.score);
+
+    return scored.slice(0, limit).map(x => x.tag);
+}
+
+/**
  * サイドバーをレンダリング
  */
 function renderSidebar() {
@@ -59,7 +81,31 @@ function renderSidebar() {
     `;
     nav.appendChild(navSection);
 
-    /* --- セクション2: 絞り込み --- */
+    /* --- セクション2: よく使うタグ（使用実績から自動的に並ぶ近道） --- */
+    const quickTags = getQuickAccessTags(6);
+    if(quickTags.length > 0) {
+        const quickLabel = document.createElement('div');
+        quickLabel.className = 'nav-section-label';
+        quickLabel.innerHTML = `<span>よく使う絞り込み</span>`;
+        nav.appendChild(quickLabel);
+
+        const quickWrap = document.createElement('div');
+        quickWrap.className = 'quick-tags';
+        quickWrap.innerHTML = quickTags.map(t => {
+            const isActive = activeFilter && activeFilter.type === 'tag' && activeFilter.id === t.id;
+            return `<button class="quick-tag ${isActive ? 'active' : ''}" data-quick-tag="${t.id}"
+                        title="「${escapeHTML(t.name)}」で絞り込む">
+                        <span>${escapeHTML(t.name)}</span>
+                        <span style="opacity:0.7;">${counts.byTag.get(t.id) || 0}</span>
+                    </button>`;
+        }).join('');
+        quickWrap.querySelectorAll('[data-quick-tag]').forEach(btn => {
+            btn.onclick = () => filterGrid(Number(btn.dataset.quickTag), null);
+        });
+        nav.appendChild(quickWrap);
+    }
+
+    /* --- セクション3: 絞り込み --- */
     const filterLabel = document.createElement('div');
     filterLabel.className = 'nav-section-label';
     filterLabel.innerHTML = `<span>タグで絞り込む</span>`;

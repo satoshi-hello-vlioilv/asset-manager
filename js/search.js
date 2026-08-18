@@ -211,6 +211,7 @@ function filterGrid(tagId, el) {
     }
 
     activeFilter = { type: 'tag', id: tagId };
+    recordUsage('tags', tagId); // よく使う絞り込みの学習
     resetSearchQuery();
 
     if(currentPage !== 'assets') showAssets({ keepFilter: true });
@@ -271,6 +272,13 @@ function updateSidebarFilterState() {
     // 「全資産一覧」は絞り込みが無いときだけ選択状態にする
     const navAll = document.getElementById('nav-all');
     if(navAll) navAll.classList.toggle('active', currentPage === 'assets' && !activeFilter);
+
+    // よく使う絞り込みチップの選択状態
+    document.querySelectorAll('[data-quick-tag]').forEach(btn => {
+        const isActive = !!activeFilter && activeFilter.type === 'tag'
+                       && activeFilter.id === Number(btn.dataset.quickTag);
+        btn.classList.toggle('active', isActive);
+    });
 
     if(!activeFilter) return;
 

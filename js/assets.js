@@ -27,6 +27,17 @@ function switchAssetView(mode, options = {}) {
 }
 
 /**
+ * 現在画面に並んでいる順序どおりの資産リストを返す
+ * （モーダルの「前へ / 次へ」と ↑↓ の行移動が、見えている順番と一致するようにする）
+ */
+function getDisplayedAssets() {
+    const list = getFilteredAssets();
+    return (listSortState.key && listSortState.direction)
+        ? sortAssetList(list, listSortState.key, listSortState.direction)
+        : list;
+}
+
+/**
  * 資産データをレンダリング（ビューモードに応じて切り替え）
  */
 function renderAssets(list) {
@@ -110,14 +121,32 @@ function renderAssetsList(list) {
     const tbody = document.createElement('tbody');
     displayList.forEach(asset => {
         const row = document.createElement('tr');
-        row.tabIndex = 0;
+        row.dataset.assetId = asset.id;
         row.onclick = () => openAssetModal(asset.id);
-        row.onkeydown = (e) => { if(e.key === 'Enter') openAssetModal(asset.id); };
+        row.onmouseenter = () => setListCursor(asset.id, { scroll: false });
 
-        visibleColumns.forEach(col => {
+        visibleColumns.forEach((col, i) => {
             const td = document.createElement('td');
             td.style.textAlign = col.align || 'left';
+
             td.innerHTML = getAssetFieldValue(asset, col.key);
+
+            // 最終列にだけホバー時のクイック操作を重ねる（開かずに1手で終わらせる導線）
+            if(i === visibleColumns.length - 1) {
+                const actions = document.createElement('span');
+                actions.className = 'row-actions';
+                actions.innerHTML = `
+                    <button class="row-action-btn" data-quick="history" title="履歴を追加"><i class="fa-solid fa-clock-rotate-left"></i></button>
+                    <button class="row-action-btn" data-quick="images" title="画像を追加"><i class="fa-solid fa-image"></i></button>`;
+                actions.querySelectorAll('[data-quick]').forEach(btn => {
+                    btn.onclick = (e) => {
+                        e.stopPropagation();
+                        openAssetModal(asset.id, btn.dataset.quick === 'history' ? 'tabMaint' : 'tabImages');
+                    };
+                });
+                td.appendChild(actions);
+            }
+
             row.appendChild(td);
         });
 
@@ -127,6 +156,55 @@ function renderAssetsList(list) {
     table.appendChild(tbody);
     listWrapper.appendChild(table);
     container.appendChild(listWrapper);
+
+    // 直前に選んでいた行があれば選択位置を復元する
+    applyListCursorClass();
+}
+
+/* ============================================================
+   一覧のキーボード操作（↑↓で行を移動し Enter で開く）
+   ============================================================ */
+
+/** 現在カーソルが当たっている行の資産ID */
+let listCursorId = null;
+
+function setListCursor(assetId, options = {}) {
+    listCursorId = assetId;
+    applyListCursorClass(options.scroll !== false);
+}
+
+function applyListCursorClass(scroll = false) {
+    let found = false;
+    document.querySelectorAll('#assetContainer .list-table tbody tr').forEach(tr => {
+        const isCursor = tr.dataset.assetId === listCursorId;
+        tr.classList.toggle('is-cursor', isCursor);
+        if(isCursor) {
+            found = true;
+            if(scroll) tr.scrollIntoView({ block: 'nearest' });
+        }
+    });
+    if(!found) listCursorId = null;
+}
+
+/**
+ * カーソルを上下に動かす
+ * @param {number} delta
+ */
+function moveListCursor(delta) {
+    const rows = Array.from(document.querySelectorAll('#assetContainer .list-table tbody tr'));
+    if(rows.length === 0) return;
+
+    const current = rows.findIndex(tr => tr.dataset.assetId === listCursorId);
+    const next = current < 0
+        ? (delta > 0 ? 0 : rows.length - 1)
+        : Math.min(rows.length - 1, Math.max(0, current + delta));
+
+    setListCursor(rows[next].dataset.assetId);
+}
+
+/** カーソル位置の資産を開く */
+function openListCursor() {
+    if(listCursorId) openAssetModal(listCursorId);
 }
 
 /**

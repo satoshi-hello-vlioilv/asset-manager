@@ -140,6 +140,16 @@
                         <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
                     <div class="menu" id="moreMenu">
+                        <div class="menu-label">表示</div>
+                        <button class="menu-item" id="menuDensityCompact" onclick="setDensity('compact')">
+                            <i class="fa-solid fa-check"></i>
+                            <span>コンパクト<span class="menu-item-sub" style="display:block;">一度に多くの行を表示</span></span>
+                        </button>
+                        <button class="menu-item" id="menuDensityCozy" onclick="setDensity('cozy')">
+                            <i class="fa-solid fa-check"></i>
+                            <span>ゆったり<span class="menu-item-sub" style="display:block;">文字と余白を大きく</span></span>
+                        </button>
+                        <div class="menu-sep"></div>
                         <div class="menu-label">設定</div>
                         <button class="menu-item" onclick="closeMenus(); openMasterModal();">
                             <i class="fa-solid fa-sitemap"></i><span>マスタ・タグ設定</span>
@@ -236,8 +246,18 @@
                 </div>
             </div>
             <div class="modal-header-actions">
+                <!-- 一覧を順に確認するための前後移動（閉じて開き直す手間をなくす） -->
+                <div class="record-nav" id="assetRecordNav" style="display:none;">
+                    <button class="btn btn-ghost btn-sm btn-icon-only" onclick="stepAsset(-1)" title="前の資産 (Alt+←)" aria-label="前の資産">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <span class="record-nav-pos" id="assetRecordPos"></span>
+                    <button class="btn btn-ghost btn-sm btn-icon-only" onclick="stepAsset(1)" title="次の資産 (Alt+→)" aria-label="次の資産">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
                 <button class="btn btn-ghost btn-icon-only" onclick="closeModal('assetModal')" title="閉じる (Esc)" aria-label="閉じる">
-                    <i class="fa-solid fa-xmark fa-lg"></i>
+                    <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
         </div>
@@ -268,24 +288,32 @@
                         <div class="form-grid">
                             <div class="field">
                                 <label class="field-label" for="editAssetName">資産名称</label>
-                                <input type="text" id="editAssetName" class="input" placeholder="例: フォークリフト No.101">
+                                <input type="text" id="editAssetName" class="input" placeholder="例: フォークリフト No.101" autocomplete="off">
+                                <!-- 重複チェックと連番の提案（入力中に即座に出る） -->
+                                <div class="suggest-row" id="nameSuggestRow" style="display:none;"></div>
                             </div>
                             <div class="field">
                                 <label class="field-label" for="editAssetDate">設置 / 導入日</label>
-                                <input type="date" id="editAssetDate" class="input">
+                                <div style="display:flex; gap:5px;">
+                                    <input type="date" id="editAssetDate" class="input">
+                                    <button type="button" class="btn btn-outline btn-sm" onclick="setDateFieldToday('editAssetDate')" title="今日の日付を入れる">今日</button>
+                                </div>
                             </div>
 
                             <div class="field span-2">
                                 <span class="field-label">稼働状況</span>
                                 <!-- ステータス候補は js/config.js の STATUS_DEFS から動的に生成 -->
-                                <div id="statusCheckboxContainer" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+                                <div id="statusCheckboxContainer" style="display:flex; gap:5px; flex-wrap:wrap;"></div>
                             </div>
 
-                            <div id="dynamicInputContainer" class="span-2" style="display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4) var(--space-5);"></div>
+                            <!-- タグの一括提案（前回と同じ構成をワンクリックで） -->
+                            <div class="suggest-row span-2" id="tagSetSuggestRow" style="display:none;"></div>
+
+                            <div id="dynamicInputContainer" class="span-2" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:10px var(--space-4);"></div>
 
                             <div class="field span-2">
                                 <label class="field-label" for="editAssetSpecs">備考</label>
-                                <textarea id="editAssetSpecs" class="input" placeholder="補足情報や特記事項を入力"></textarea>
+                                <textarea id="editAssetSpecs" class="input" rows="3" placeholder="補足情報や特記事項を入力"></textarea>
                             </div>
                         </div>
                     </div>
@@ -320,14 +348,9 @@
                                 <span class="kbd">Ctrl</span><span class="kbd">V</span> で貼り付け
                             </span>
                             <span class="image-dropzone-or">/</span>
-                            <span class="image-dropzone-method"><i class="fa-solid fa-arrow-down-to-line"></i> ドラッグ&amp;ドロップ</span>
+                            <span class="image-dropzone-method"><i class="fa-solid fa-arrow-down-to-line"></i> ドロップ</span>
                             <span class="image-dropzone-or">/</span>
                             <span class="image-dropzone-method"><i class="fa-solid fa-folder-open"></i> クリックして選択</span>
-                        </div>
-                        <div class="field-hint" style="margin-top:10px;">
-                            スクリーンショット（Windows: <span class="kbd">Win</span><span class="kbd">Shift</span><span class="kbd">S</span> /
-                            Mac: <span class="kbd">⌘</span><span class="kbd">Ctrl</span><span class="kbd">Shift</span><span class="kbd">4</span>）を撮って、
-                            この画面でそのまま貼り付けられます
                         </div>
                     </div>
 
@@ -435,27 +458,26 @@
             <!-- Tab 6: 周期計画 -->
             <div id="tabSchedule" class="tab-pane">
                 <div class="tab-stack">
-                    <div class="form-card">
-                        <h4 class="section-title" style="margin-bottom:var(--space-4);">
-                            <i class="fa-solid fa-circle-plus" style="color:var(--primary);"></i> 新規周期計画追加
-                        </h4>
-                        <div style="display:grid; grid-template-columns:170px 130px 1fr auto; gap:var(--space-3); align-items:end;">
-                            <div class="field">
-                                <label class="field-label" for="newScheduleDate">実施予定日</label>
-                                <input type="date" id="newScheduleDate" class="input">
-                            </div>
-                            <div class="field">
-                                <label class="field-label" for="newScheduleCycle">周期（日）</label>
-                                <input type="number" id="newScheduleCycle" class="input" placeholder="例: 30" min="1">
-                            </div>
-                            <div class="field">
-                                <label class="field-label" for="newScheduleEvent">実施内容</label>
-                                <input type="text" id="newScheduleEvent" class="input" placeholder="例: 定期点検">
-                            </div>
-                            <button class="btn btn-primary" onclick="addScheduleRecord()" style="height:38px;">
-                                <i class="fa-solid fa-plus"></i> 追加
-                            </button>
+                    <div class="inline-form" style="grid-template-columns:150px 120px minmax(0,1fr) auto;">
+                        <div class="field">
+                            <label class="field-label" for="newScheduleDate">実施予定日</label>
+                            <input type="date" id="newScheduleDate" class="input">
                         </div>
+                        <div class="field">
+                            <label class="field-label" for="newScheduleCycle">周期（日）</label>
+                            <input type="number" id="newScheduleCycle" class="input" placeholder="任意" min="1"
+                                   oninput="updateScheduleDateFromCycle()">
+                        </div>
+                        <div class="field">
+                            <label class="field-label" for="newScheduleEvent">実施内容</label>
+                            <input type="text" id="newScheduleEvent" class="input" placeholder="例: 定期点検"
+                                   list="eventSuggestions" autocomplete="off">
+                        </div>
+                        <button class="btn btn-primary" onclick="addScheduleRecord()">
+                            <i class="fa-solid fa-plus"></i> 追加
+                        </button>
+                        <!-- よく使う周期と実施内容をワンクリックで入れる -->
+                        <div class="suggest-row" style="grid-column:1/-1;" id="scheduleSuggestRow"></div>
                     </div>
 
                     <div>
@@ -474,23 +496,21 @@
             <!-- Tab 7: 履歴 -->
             <div id="tabMaint" class="tab-pane">
                 <div class="tab-stack">
-                    <div class="form-card">
-                        <h4 class="section-title" style="margin-bottom:var(--space-4);">
-                            <i class="fa-solid fa-circle-plus" style="color:var(--primary);"></i> 新規イベント追加
-                        </h4>
-                        <div style="display:grid; grid-template-columns:190px 1fr auto; gap:var(--space-3); align-items:end;">
-                            <div class="field">
-                                <label class="field-label" for="newHistoryDate">実施日</label>
-                                <input type="date" id="newHistoryDate" class="input">
-                            </div>
-                            <div class="field">
-                                <label class="field-label" for="newHistoryEvent">実施内容</label>
-                                <input type="text" id="newHistoryEvent" class="input" placeholder="実施した作業や発生したイベントを記入">
-                            </div>
-                            <button class="btn btn-primary" onclick="addHistoryRecord()" style="height:38px;">
-                                <i class="fa-solid fa-plus"></i> 追加
-                            </button>
+                    <div class="inline-form" style="grid-template-columns:150px minmax(0,1fr) auto;">
+                        <div class="field">
+                            <label class="field-label" for="newHistoryDate">実施日</label>
+                            <input type="date" id="newHistoryDate" class="input">
                         </div>
+                        <div class="field">
+                            <label class="field-label" for="newHistoryEvent">実施内容</label>
+                            <input type="text" id="newHistoryEvent" class="input" placeholder="実施した作業や発生したイベントを記入"
+                                   list="eventSuggestions" autocomplete="off"
+                                   onkeydown="if(event.key==='Enter'){event.preventDefault(); addHistoryRecord();}">
+                        </div>
+                        <button class="btn btn-primary" onclick="addHistoryRecord()">
+                            <i class="fa-solid fa-plus"></i> 追加
+                        </button>
+                        <div class="suggest-row" style="grid-column:1/-1;" id="historySuggestRow"></div>
                     </div>
 
                     <div>
@@ -505,6 +525,9 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 履歴・周期計画の実施内容サジェスト（過去の入力から自動生成） -->
+            <datalist id="eventSuggestions"></datalist>
         </div>
 
         <div class="modal-footer">
@@ -752,6 +775,7 @@
 <!-- JavaScript Modules - 依存関係を考慮した読み込み順 -->
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/suggest.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/navigation.js"></script>
 <script src="js/search.js"></script>

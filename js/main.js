@@ -50,6 +50,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // DBからデータを読み込み (非同期待機)
     await loadDataFromDB();
 
+    // 保存されている表示密度を反映（描画前に当てて、ちらつきを避ける）
+    applyDensity();
+
     // カスタムフィールド列を動的に追加
     addCustomFieldColumns();
 
@@ -172,6 +175,13 @@ function setupGlobalEvents() {
             if(e.key === 'ArrowRight') { e.preventDefault(); stepLightbox(1);  return; }
         }
 
+        /* 資産詳細を開いている間は Alt+←/→ で一覧の前後へ移動できる
+           （閉じて別の行を探して開き直す往復をなくす） */
+        if(e.altKey && document.getElementById('assetModal').classList.contains('open')) {
+            if(e.key === 'ArrowLeft')  { e.preventDefault(); stepAsset(-1); return; }
+            if(e.key === 'ArrowRight') { e.preventDefault(); stepAsset(1);  return; }
+        }
+
         /* Ctrl/⌘ + K: コマンドパレット（どこからでも） */
         if(modKey && e.key.toLowerCase() === 'k') {
             e.preventDefault();
@@ -197,6 +207,13 @@ function setupGlobalEvents() {
             pendingChord = null;
             if(e.key.toLowerCase() === 'd') { e.preventDefault(); showDashboard(); return; }
             if(e.key.toLowerCase() === 'a') { e.preventDefault(); showAssets();    return; }
+        }
+
+        /* 一覧を ↑↓ で辿り、Enter で開く（マウスに持ち替えずに確認していける） */
+        if(currentPage === 'assets' && assetViewMode === 'list') {
+            if(e.key === 'ArrowDown') { e.preventDefault(); moveListCursor(1);  return; }
+            if(e.key === 'ArrowUp')   { e.preventDefault(); moveListCursor(-1); return; }
+            if(e.key === 'Enter' && listCursorId) { e.preventDefault(); openListCursor(); return; }
         }
 
         switch(e.key) {

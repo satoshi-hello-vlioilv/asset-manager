@@ -60,6 +60,28 @@ function getPersistedAssets() {
 }
 
 /**
+ * 今日の日付（YYYY-MM-DD）
+ * new Date().toISOString() はUTC基準になり日本時間の朝はズレるため、ローカル日付で作る。
+ */
+function todayISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * 日付文字列に日数を足す
+ * @param {string} dateStr - YYYY-MM-DD
+ * @param {number} days
+ * @returns {string} YYYY-MM-DD
+ */
+function addDaysISO(dateStr, days) {
+    const d = new Date(dateStr);
+    if(isNaN(d)) return dateStr;
+    d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
  * 今日から指定日までの日数（過去なら負の数）
  * @param {string} dateStr - YYYY-MM-DD
  * @returns {number}

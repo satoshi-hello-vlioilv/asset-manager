@@ -168,7 +168,7 @@ function setupGlobalDropZone() {
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(37, 99, 235, 0.1);
+            background: rgba(39, 83, 136, 0.1);
             backdrop-filter: blur(4px);
             z-index: 10000;
             display: flex;

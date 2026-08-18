@@ -19,9 +19,9 @@ function renderListColumnsSettings() {
     // ── 「tags」列がある場合の移行ヒント ──
     const hasSingleTagsCol = sortedColumns.some(c => c.key === 'tags');
     const migrateHint = hasSingleTagsCol ? `
-        <div style="display:flex; align-items:flex-start; gap:8px; padding:7px 10px; background:#fef9c3; border:1px solid #fde68a; border-radius:6px; margin-bottom:6px; flex-shrink:0;">
-            <i class="fa-solid fa-lightbulb" style="color:#d97706; font-size:0.8rem; margin-top:2px; flex-shrink:0;"></i>
-            <div style="font-size:0.78rem; color:#92400e; line-height:1.4;">「タグ（すべて）」列をマスタごとに分解できます。右欄から各マスタの列を追加した後、この列を削除してください。</div>
+        <div style="display:flex; align-items:flex-start; gap:8px; padding:7px 10px; background:var(--warning-bg); border:1px solid var(--a-200); border-radius:6px; margin-bottom:6px; flex-shrink:0;">
+            <i class="fa-solid fa-lightbulb" style="color:var(--warning); font-size:0.8rem; margin-top:2px; flex-shrink:0;"></i>
+            <div style="font-size:0.78rem; color:var(--warning-fg); line-height:1.4;">「タグ（すべて）」列をマスタごとに分解できます。右欄から各マスタの列を追加した後、この列を削除してください。</div>
         </div>
     ` : '';
 
@@ -38,24 +38,24 @@ function renderListColumnsSettings() {
 
         leftItems += `
             <div class="list-column-item" data-key="${col.key}" draggable="true"
-                 style="display:flex; flex-direction:column; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; transition:border-color 0.15s, box-shadow 0.15s; ${col.visible ? '' : 'opacity:0.5;'}">
+                 style="display:flex; flex-direction:column; background:var(--surface-sunken); border:1px solid var(--border); border-radius:6px; transition:border-color 0.15s, box-shadow 0.15s; ${col.visible ? '' : 'opacity:0.5;'}">
                 <!-- Main row -->
                 <div style="display:flex; align-items:center; gap:5px; padding:6px 7px;">
-                    <i class="fa-solid fa-grip-vertical" style="color:#cbd5e1; cursor:move; flex-shrink:0; font-size:0.75rem;"></i>
+                    <i class="fa-solid fa-grip-vertical" style="color:var(--border-strong); cursor:move; flex-shrink:0; font-size:0.75rem;"></i>
                     <input type="checkbox" ${col.visible ? 'checked' : ''} 
                            onchange="toggleColumnVisibility('${col.key}', this.checked); this.closest('.list-column-item').style.opacity = this.checked ? '1' : '0.5';"
                            style="width:15px; height:15px; cursor:pointer; flex-shrink:0; accent-color:var(--primary);">
                     <span style="flex:1; font-size:0.86rem; font-weight:600; color:var(--text-main); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${col.label}">${col.label}</span>
                     <!-- データ配置 -->
                     <select onchange="updateColumnAlign('${col.key}', this.value)" title="データ配置"
-                            style="font-size:0.74rem; padding:2px 20px 2px 5px; border:1px solid #e2e8f0; border-radius:4px; color:var(--text-sub); background:#fff; flex-shrink:0;">
+                            style="font-size:0.74rem; padding:2px 20px 2px 5px; border:1px solid var(--border); border-radius:4px; color:var(--text-sub); background:#fff; flex-shrink:0;">
                         <option value="left" ${col.align === 'left' ? 'selected' : ''}>左</option>
                         <option value="center" ${col.align === 'center' ? 'selected' : ''}>中</option>
                         <option value="right" ${col.align === 'right' ? 'selected' : ''}>右</option>
                     </select>
                     <!-- 列幅タイプ -->
                     <select onchange="updateColumnWidthType('${col.key}', this.value)" title="列幅"
-                            style="font-size:0.74rem; padding:2px 20px 2px 5px; border:1px solid #e2e8f0; border-radius:4px; color:var(--text-sub); background:#fff; flex-shrink:0;">
+                            style="font-size:0.74rem; padding:2px 20px 2px 5px; border:1px solid var(--border); border-radius:4px; color:var(--text-sub); background:#fff; flex-shrink:0;">
                         <option value="auto" ${widthType === 'auto' ? 'selected' : ''}>自動</option>
                         <option value="fixed" ${widthType === 'fixed' ? 'selected' : ''}>固定</option>
                         <option value="equal" ${widthType === 'equal' ? 'selected' : ''}>均等</option>
@@ -64,26 +64,26 @@ function renderListColumnsSettings() {
                     <!-- 固定幅値入力（常にDOM存在、display切り替え） -->
                     <input type="number" id="fixedWidth-${col.key}" value="${widthValue}" min="50" max="800"
                            onchange="updateColumnWidthValue('${col.key}', parseInt(this.value))"
-                           style="width:48px; font-size:0.74rem; padding:2px 4px; border:1px solid #e2e8f0; border-radius:4px; flex-shrink:0; display:${widthType === 'fixed' ? 'inline-block' : 'none'};">
+                           style="width:48px; font-size:0.74rem; padding:2px 4px; border:1px solid var(--border); border-radius:4px; flex-shrink:0; display:${widthType === 'fixed' ? 'inline-block' : 'none'};">
                     <!-- 詳細設定トグル -->
                     <button onclick="toggleColumnSettings('${col.key}')" title="ヘッダー配置等"
-                            style="flex-shrink:0; background:none; border:none; cursor:pointer; color:#cbd5e1; padding:2px 3px; border-radius:3px; transition:color 0.15s; font-size:0.73rem;"
-                            onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='#cbd5e1'">
+                            style="flex-shrink:0; background:none; border:none; cursor:pointer; color:var(--border-strong); padding:2px 3px; border-radius:3px; transition:color 0.15s; font-size:0.73rem;"
+                            onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--border-strong)'">
                         <i class="fa-solid fa-cog"></i>
                     </button>
                     <!-- 削除 -->
                     <button onclick="removeColumn('${col.key}')" title="列を削除"
-                            style="flex-shrink:0; background:none; border:none; cursor:pointer; color:#cbd5e1; padding:2px 3px; border-radius:3px; transition:color 0.15s; font-size:0.73rem;"
-                            onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#cbd5e1'">
+                            style="flex-shrink:0; background:none; border:none; cursor:pointer; color:var(--border-strong); padding:2px 3px; border-radius:3px; transition:color 0.15s; font-size:0.73rem;"
+                            onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--border-strong)'">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </div>
                 <!-- 詳細設定行（折り畳み） -->
-                <div id="settings-${col.key}" style="display:none; padding:0 7px 7px 28px; border-top:1px solid #f1f5f9;">
+                <div id="settings-${col.key}" style="display:none; padding:0 7px 7px 28px; border-top:1px solid var(--surface-muted);">
                     <div style="display:flex; align-items:center; gap:10px; padding-top:5px;">
                         <label style="font-size:0.74rem; color:var(--text-sub); white-space:nowrap;">ヘッダー配置:</label>
                         <select onchange="updateColumnHeaderAlign('${col.key}', this.value)"
-                                style="font-size:0.74rem; padding:2px 20px 2px 5px; border:1px solid #e2e8f0; border-radius:4px; color:var(--text-sub); background:#fff;">
+                                style="font-size:0.74rem; padding:2px 20px 2px 5px; border:1px solid var(--border); border-radius:4px; color:var(--text-sub); background:#fff;">
                             <option value="left" ${(!col.headerAlign || col.headerAlign === 'left') ? 'selected' : ''}>左寄せ</option>
                             <option value="center" ${col.headerAlign === 'center' ? 'selected' : ''}>中央揃え</option>
                             <option value="right" ${col.headerAlign === 'right' ? 'selected' : ''}>右寄せ</option>
@@ -110,24 +110,24 @@ function renderListColumnsSettings() {
             groupItems += `
                 <div class="available-col-item" data-key="${col.key}" data-category="${category}" ${col.masterId ? `data-master="${col.masterId}"` : ''}
                      style="display:flex; align-items:center; gap:6px; padding:4px 8px; cursor:${isAdded ? 'default' : 'pointer'};
-                            background:${isAdded ? '#f0fdf4' : '#fff'};
-                            ${idx < catCols.length - 1 ? 'border-bottom:1px solid #f1f5f9;' : ''}
+                            background:${isAdded ? 'var(--success-bg)' : '#fff'};
+                            ${idx < catCols.length - 1 ? 'border-bottom:1px solid var(--surface-muted);' : ''}
                             transition:background 0.12s;"
                      ${!isAdded ? `onmouseover="this.style.background='#eef2ff'" onmouseout="this.style.background='#fff'" onclick="addColumnByKey('${col.key}')"` : ''}>
                     ${isAdded
-                        ? `<i class="fa-solid fa-check" style="color:#10b981; font-size:0.7rem; width:12px; flex-shrink:0;"></i>`
+                        ? `<i class="fa-solid fa-check" style="color:var(--success); font-size:0.7rem; width:12px; flex-shrink:0;"></i>`
                         : `<i class="fa-solid fa-plus-circle" style="color:var(--primary); font-size:0.7rem; width:12px; flex-shrink:0; opacity:0.7;"></i>`
                     }
                     <span style="font-size:0.83rem; color:${isAdded ? '#6b7280' : 'var(--text-main)'}; flex:1;">${col.label}</span>
-                    ${isAdded ? `<span style="font-size:0.7rem; color:#10b981; font-weight:600;">追加済</span>` : ''}
+                    ${isAdded ? `<span style="font-size:0.7rem; color:var(--success); font-weight:600;">追加済</span>` : ''}
                 </div>
             `;
         });
 
         rightGroups += `
             <div class="available-col-group" data-category="${category}" style="margin-bottom:5px;">
-                <div style="font-size:0.72rem; font-weight:700; color:#64748b; padding:4px 8px 2px; background:#f1f5f9; border:1px solid #e8ecf0; border-radius:4px 4px 0 0; letter-spacing:0.3px;">${category}</div>
-                <div style="border:1px solid #e8ecf0; border-top:none; border-radius:0 0 4px 4px; overflow:hidden;">
+                <div style="font-size:0.72rem; font-weight:700; color:var(--text-sub); padding:4px 8px 2px; background:var(--surface-muted); border:1px solid var(--border); border-radius:4px 4px 0 0; letter-spacing:0.3px;">${category}</div>
+                <div style="border:1px solid var(--border); border-top:none; border-radius:0 0 4px 4px; overflow:hidden;">
                     ${groupItems}
                 </div>
             </div>

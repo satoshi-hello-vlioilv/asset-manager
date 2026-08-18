@@ -7,133 +7,171 @@
    モーダル
    ============================================================ */
 .modal-overlay {
-    position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(3px);
+    position: fixed; inset: 0; background: rgba(23, 28, 36, 0.45); backdrop-filter: blur(2px);
     z-index: var(--z-modal); display: none; align-items: center; justify-content: center;
     opacity: 0; transition: opacity var(--dur) var(--ease); padding: var(--space-4);
 }
 .modal-overlay.open { display: flex; opacity: 1; }
 
-/* マスタ管理（全画面） */
 .modal-full {
-    width: 96%; height: 94%; background: var(--surface); border-radius: var(--radius-xl);
+    width: 97%; height: 95%; background: var(--surface); border-radius: var(--radius-xl);
     display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-xl);
 }
-
-/* 資産詳細 */
 .modal-large {
-    width: 1180px; max-width: 100%; height: 92vh; background: var(--surface);
+    width: 1240px; max-width: 100%; height: 94vh; background: var(--surface);
     border-radius: var(--radius-xl); display: flex; flex-direction: column; overflow: hidden;
     box-shadow: var(--shadow-xl);
 }
-
-/* 中サイズ */
 .modal-mid {
     width: 560px; max-width: 100%; max-height: 90vh; background: var(--surface);
     border-radius: var(--radius-xl); display: flex; flex-direction: column; overflow: hidden;
     box-shadow: var(--shadow-xl);
 }
 .modal-wide {
-    width: 900px; max-width: 100%; max-height: 88vh; background: var(--surface);
+    width: 920px; max-width: 100%; max-height: 88vh; background: var(--surface);
     border-radius: var(--radius-xl); display: flex; flex-direction: column; overflow: hidden;
     box-shadow: var(--shadow-xl);
 }
 .modal-overlay.open > * { animation: modalIn var(--dur) var(--ease); }
 @keyframes modalIn {
-    from { opacity: 0; transform: translateY(8px) scale(0.99); }
+    from { opacity: 0; transform: translateY(6px) scale(0.995); }
     to   { opacity: 1; transform: none; }
 }
 
 .modal-header {
-    padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--border);
-    display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-4);
+    padding: 10px var(--space-4); border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center; gap: var(--space-3);
     background: var(--surface); flex-shrink: 0;
 }
-.modal-title-block { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.modal-title-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.modal-title-block { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.modal-title-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .modal-title-block h3 {
-    margin: 0; font-size: var(--text-xl); font-weight: 700; color: var(--text-strong);
-    overflow: hidden; text-overflow: ellipsis;
+    margin: 0; font-size: var(--text-lg); font-weight: 700; color: var(--text-strong);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .modal-meta-row {
-    display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
-    font-size: var(--text-xs); color: var(--text-sub);
+    display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+    font-size: var(--text-2xs); color: var(--text-faint);
 }
 .modal-meta-row .mono { font-family: var(--font-mono); }
-.modal-header-actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+.modal-header-actions { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 
 .modal-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
 .modal-footer {
-    padding: var(--space-3) var(--space-5); border-top: 1px solid var(--border);
-    display: flex; justify-content: flex-end; align-items: center; gap: var(--space-3);
+    padding: 8px var(--space-4); border-top: 1px solid var(--border);
+    display: flex; justify-content: flex-end; align-items: center; gap: var(--space-2);
     background: var(--surface); flex-shrink: 0;
 }
-.modal-footer-hint { margin-right: auto; font-size: var(--text-xs); color: var(--text-faint); display: flex; align-items: center; gap: 6px; }
+.modal-footer-hint { margin-right: auto; font-size: var(--text-2xs); color: var(--text-faint); display: flex; align-items: center; gap: 5px; }
 
 /* ============================================================
    タブ
-   ラベルに件数を添えて「中身があるか」を開く前に分かるようにする
    ============================================================ */
 .tabs {
-    display: flex; border-bottom: 1px solid var(--border); padding: 0 var(--space-5);
-    background: var(--surface); flex-shrink: 0; gap: 2px; overflow-x: auto;
+    display: flex; border-bottom: 1px solid var(--border); padding: 0 var(--space-4);
+    background: var(--surface); flex-shrink: 0; gap: 1px; overflow-x: auto;
 }
 .tab {
-    padding: 11px var(--space-3); font-size: var(--text-base); font-weight: 500; color: var(--text-sub);
+    padding: 7px 10px; font-size: var(--text-base); font-weight: 500; color: var(--text-sub);
     cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
-    display: flex; align-items: center; gap: 6px;
+    display: flex; align-items: center; gap: 5px;
     transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 .tab:hover { color: var(--text); background: var(--surface-hover); }
-.tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 700; }
-.tab .count-pill { font-size: var(--text-2xs); }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 650; }
 .tab.active .count-pill { background: var(--primary-bg); color: var(--primary-dark); }
 /* 未入力のタブは淡く（どこを埋めるべきかが一目で分かる） */
 .tab.is-empty { color: var(--text-faint); }
 .tab.is-empty.active { color: var(--primary); }
 
-.tab-content-area { flex: 1; overflow-y: auto; padding: var(--space-5); background: var(--canvas); }
+.tab-content-area { flex: 1; overflow-y: auto; padding: var(--space-3) var(--space-4); background: var(--canvas); }
 .tab-pane { display: none; animation: fadeIn var(--dur-slow) var(--ease); }
 .tab-pane.active { display: block; }
-.tab-stack { display: grid; gap: var(--space-4); }
+.tab-stack { display: grid; gap: var(--space-3); }
 
-@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 
 /* モーダル内のフォームカード */
 .form-card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius-lg); padding: var(--space-5);
+    border-radius: var(--radius-lg); padding: var(--d-card-pad);
 }
-.form-card > .section-head { margin-bottom: var(--space-4); }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4) var(--space-5); }
-.form-grid .span-2 { grid-column: 1 / -1; }
+.form-card > .section-head { margin-bottom: var(--space-3); }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px var(--space-4); }
+.form-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px var(--space-4); }
+.form-grid .span-2, .form-grid-3 .span-all { grid-column: 1 / -1; }
+
+/* インラインの追加フォーム（履歴・周期計画） */
+.inline-form {
+    display: grid; gap: 8px var(--space-3); align-items: end;
+    padding: 10px var(--d-card-pad); background: var(--surface-sunken);
+    border: 1px solid var(--border); border-radius: var(--radius-lg);
+}
+
+/* 履歴・周期計画のレコード行 */
+.record-row {
+    display: flex; gap: var(--space-3); align-items: center;
+    padding: var(--d-row-py) var(--d-row-px); border-bottom: 1px solid var(--border-subtle);
+    transition: background var(--dur-fast) var(--ease);
+}
+.record-row:last-child { border-bottom: none; }
+.record-row:hover { background: var(--surface-hover); }
+.record-date {
+    flex: 0 0 118px; display: flex; flex-direction: column; line-height: 1.3;
+    font-size: var(--text-base); font-weight: 600; color: var(--text-strong);
+}
+.record-rel { font-size: var(--text-2xs); color: var(--text-faint); font-weight: 500; }
+.record-body {
+    flex: 1; min-width: 0; font-size: var(--text-base); color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.record-meta {
+    font-size: var(--text-2xs); color: var(--text-faint);
+    display: inline-flex; gap: 4px; align-items: center; margin-left: 8px;
+}
+.record-actions { flex: 0 0 auto; display: flex; gap: 2px; opacity: 0; transition: opacity var(--dur) var(--ease); }
+.record-row:hover .record-actions, .record-actions:focus-within { opacity: 1; }
+.record-row.is-overdue { box-shadow: inset 2px 0 0 var(--danger); }
 
 /* ============================================================
    タグ入力（オートコンプリート）
    ============================================================ */
 .tag-input-container {
-    padding: 6px var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-md);
-    display: flex; gap: 6px; flex-wrap: wrap; min-height: 42px; align-items: center;
+    padding: 3px 6px; border: 1px solid var(--border); border-radius: var(--radius-md);
+    display: flex; gap: 4px; flex-wrap: wrap; min-height: var(--d-ctl-h); align-items: center;
     background: var(--surface); position: relative; cursor: text;
     transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 .tag-input-container:hover { border-color: var(--border-strong); }
 .tag-input-container:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-ring); }
 .tag-input-field {
-    border: none; outline: none; flex: 1; min-width: 110px; font-family: inherit;
-    font-size: var(--text-base); padding: 4px; background: transparent; color: var(--text);
+    border: none; outline: none; flex: 1; min-width: 90px; font-family: inherit;
+    font-size: var(--text-base); padding: 2px; background: transparent; color: var(--text);
 }
 .tag-input-field::placeholder { color: var(--text-faint); }
 .tag-dropdown {
-    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    position: absolute; top: calc(100% + 3px); left: 0; right: 0;
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg); z-index: 50; max-height: 240px; overflow-y: auto; display: none;
-    padding: var(--space-1);
+    box-shadow: var(--shadow-lg); z-index: 50; max-height: 244px; overflow-y: auto; display: none;
+    padding: 3px;
 }
 .tag-dropdown.show { display: block; }
 .tag-dropdown-item {
-    padding: 7px 10px; cursor: pointer; font-size: var(--text-base); border-radius: var(--radius-sm);
-    display: flex; justify-content: space-between; align-items: center; gap: var(--space-2);
+    padding: 4px 8px; cursor: pointer; font-size: var(--text-base); border-radius: var(--radius-sm);
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
 }
 .tag-dropdown-item:hover, .tag-dropdown-item.active { background: var(--primary-bg); color: var(--primary-dark); }
-.tag-dropdown-empty { padding: var(--space-3) 10px; font-size: var(--text-sm); color: var(--text-faint); }
-.tag-path { font-size: var(--text-xs); color: var(--text-faint); }
+.tag-dropdown-item .tag-freq { font-size: var(--text-2xs); color: var(--text-faint); white-space: nowrap; }
+.tag-dropdown-empty { padding: var(--space-2) 8px; font-size: var(--text-xs); color: var(--text-faint); }
+.tag-path { font-size: var(--text-2xs); color: var(--text-faint); }
+
+/* タグのチップ（選択済み） */
+.tag-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 4px 1px 7px; border-radius: var(--radius-sm);
+    background: var(--primary-bg); color: var(--primary-dark); border: 1px solid var(--primary-border);
+    font-size: var(--text-2xs); font-weight: 600; max-width: 100%;
+}
+.tag-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag-chip i { cursor: pointer; opacity: 0.55; padding: 2px; font-size: 0.65rem; }
+.tag-chip i:hover { opacity: 1; }

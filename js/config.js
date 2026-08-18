@@ -6,7 +6,7 @@
 
 // アプリケーションバージョン（セマンティックバージョニング）
 // サイドバーのアプリ名横に表示される。更新時はここを変更するだけでよい。
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 
 // Dexie.js データベース定義
 const DB_NAME = 'AssetManagerDB';
@@ -89,12 +89,13 @@ const FIELD_TYPES = {
 // 資産ステータス定義
 // ここに1行追加するだけで、資産編集画面のチェックボックス・一覧のバッジ色・
 // 資産構成グラフのノード色に自動反映されます（定義順 = グラフ色分けの優先順）
+// nodeColor は css/base.css の状態色トークンと同じ値を使う（画面全体で同じ意味・同じ色）
 const STATUS_DEFS = [
-    { value: '稼働中', badge: 'badge-green', nodeColor: '#10b981' },
-    { value: '停止中', badge: 'badge-red',   nodeColor: '#ef4444' },
-    { value: '修理中', badge: 'badge-red',   nodeColor: '#ef4444' },
-    { value: '点検中', badge: 'badge-blue',  nodeColor: '#f59e0b' },
-    { value: '廃棄',   badge: 'badge-gray',  nodeColor: '#64748b' }
+    { value: '稼働中', badge: 'badge-green',  nodeColor: '#1c7a4c' }, // 正常
+    { value: '点検中', badge: 'badge-orange', nodeColor: '#c98a12' }, // 注意・進行中
+    { value: '修理中', badge: 'badge-orange', nodeColor: '#a86a09' }, // 注意・対応中
+    { value: '停止中', badge: 'badge-red',    nodeColor: '#b03024' }, // 停止・要対応
+    { value: '廃棄',   badge: 'badge-gray',   nodeColor: '#6c7787' }  // 対象外
 ];
 
 // マスタ定義 (初期データ)
@@ -269,6 +270,12 @@ let calendarState = {
     month: new Date().getMonth()
 };
 
+// 表示に関するユーザー設定（IndexedDBに保存される）
+// density: 'compact' = 情報密度を優先 / 'cozy' = 余白を広げて読みやすさを優先
+let uiPrefs = {
+    density: 'compact'
+};
+
 // リスト表示設定
 let listDisplaySettings = {
     columns: [
@@ -344,6 +351,8 @@ async function saveDataToDB() {
 
             // システム設定の保存
             await db.system.put({ key: 'listDisplaySettings', value: listDisplaySettings });
+            await db.system.put({ key: 'uiPrefs', value: uiPrefs });
+            await db.system.put({ key: 'lastCreatedAssetId', value: lastCreatedAssetId });
             await db.system.put({ key: 'nextTagId', value: nextTagId });
             await db.system.put({ key: 'nextAssetId', value: nextAssetId });
             await db.system.put({ key: 'version', value: '2.0' });
@@ -383,6 +392,18 @@ async function loadDataFromDB() {
         const settingsEntry = await db.system.get('listDisplaySettings');
         const tagIdEntry = await db.system.get('nextTagId');
         const assetIdEntry = await db.system.get('nextAssetId');
+        const prefsEntry = await db.system.get('uiPrefs');
+        const usageEntry = await db.system.get('usageStats');
+        const lastCreatedEntry = await db.system.get('lastCreatedAssetId');
+
+        if(prefsEntry && prefsEntry.value) uiPrefs = { ...uiPrefs, ...prefsEntry.value };
+        if(usageEntry && usageEntry.value) {
+            // 想定外の形で保存されていても壊れないよう、キーごとに取り込む
+            ['tags', 'commands', 'assets', 'events'].forEach(k => {
+                if(usageEntry.value[k]) usageStats[k] = usageEntry.value[k];
+            });
+        }
+        if(lastCreatedEntry) lastCreatedAssetId = lastCreatedEntry.value;
 
         // グローバル変数を更新
         assets = loadedAssets;

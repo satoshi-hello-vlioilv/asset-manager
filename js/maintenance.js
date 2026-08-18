@@ -20,12 +20,11 @@ function renderHistoryRecords() {
     
     if(asset.maintenance.length === 0) {
         container.innerHTML = `
-            <div style="padding:60px 20px; text-align:center; color:var(--text-sub);">
-                <i class="fa-regular fa-calendar-xmark" style="font-size:3rem; margin-bottom:12px; display:block; opacity:0.3;"></i>
-                <div style="font-size:0.95rem;">履歴はまだ登録されていません</div>
-                <div style="font-size:0.85rem; margin-top:4px; opacity:0.7;">上のフォームから追加してください</div>
-            </div>
-        `;
+            <div class="empty-state">
+                <i class="fa-regular fa-clock empty-state-icon"></i>
+                <div class="empty-state-title">履歴はまだありません</div>
+                <div class="empty-state-desc">上のフォームに実施内容を入力して追加してください</div>
+            </div>`;
         return;
     }
     
@@ -38,55 +37,45 @@ function renderHistoryRecords() {
         }
     });
     
-    // リスト表示
-    let html = '<div style="padding:0;">';
-    sortedRecords.forEach((record, originalIndex) => {
-        // 元のインデックスを取得
+    // リスト表示（1行1件。編集中のみ入力欄に切り替える）
+    container.innerHTML = sortedRecords.map(record => {
         const index = asset.maintenance.indexOf(record);
         const isEditing = record._editing;
-        
-        html += `
-            <div style="padding:16px 20px; border-bottom:1px solid #f1f5f9; display:flex; gap:16px; align-items:start;" id="history-item-${index}">
-                <div style="flex:0 0 160px;">
-                    ${isEditing ? `
-                        <input type="date" id="edit-date-${index}" value="${record.date}" class="input" style="width:100%; font-size:0.9rem;">
-                    ` : `
-                        <div style="display:flex; flex-direction:column; gap:2px;">
-                            <div style="font-size:0.95rem; font-weight:600; color:var(--text-main);">${record.date}</div>
-                            <div style="font-size:0.75rem; color:var(--text-sub);">${formatDateRelative(record.date)}</div>
-                        </div>
-                    `}
-                </div>
-                <div style="flex:1;">
-                    ${isEditing ? `
-                        <textarea id="edit-event-${index}" class="input" rows="3" style="font-size:0.9rem;">${record.event}</textarea>
-                    ` : `
-                        <div style="font-size:0.9rem; color:var(--text-main); line-height:1.6; white-space:pre-wrap;">${record.event}</div>
-                    `}
-                </div>
-                <div style="flex:0 0 auto; display:flex; gap:4px;">
-                    ${isEditing ? `
+
+        if(isEditing) {
+            return `
+                <div class="record-row" id="history-item-${index}">
+                    <input type="date" id="edit-date-${index}" value="${escapeHTML(record.date)}" class="input" style="flex:0 0 140px;">
+                    <input type="text" id="edit-event-${index}" class="input" style="flex:1;"
+                           value="${escapeHTML(record.event)}" list="eventSuggestions">
+                    <div style="display:flex; gap:4px; flex-shrink:0;">
                         <button class="btn btn-primary btn-sm" onclick="saveHistoryRecord(${index})" title="保存">
                             <i class="fa-solid fa-check"></i>
                         </button>
-                        <button class="btn btn-outline btn-sm" onclick="cancelEditHistory(${index})" title="キャンセル">
+                        <button class="btn btn-outline btn-sm" onclick="cancelEditHistory(${index})" title="取り消し">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
-                    ` : `
-                        <button class="btn btn-ghost btn-icon-only" onclick="editHistoryRecord(${index})" title="編集">
-                            <i class="fa-solid fa-pen"></i>
-                        </button>
-                        <button class="btn btn-ghost btn-icon-only" style="color:var(--danger);" onclick="deleteHistoryRecord(${index})" title="削除">
-                            <i class="fa-solid fa-trash"></i>
-                        </button>
-                    `}
+                    </div>
+                </div>`;
+        }
+
+        return `
+            <div class="record-row" id="history-item-${index}">
+                <div class="record-date">
+                    ${escapeHTML(record.date)}
+                    <span class="record-rel">${escapeHTML(formatDateRelative(record.date))}</span>
                 </div>
-            </div>
-        `;
-    });
-    html += '</div>';
-    
-    container.innerHTML = html;
+                <div class="record-body">${escapeHTML(record.event)}</div>
+                <div class="record-actions">
+                    <button class="btn btn-ghost btn-sm btn-icon-only" onclick="editHistoryRecord(${index})" title="編集">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <button class="btn btn-danger-ghost btn-sm btn-icon-only" onclick="deleteHistoryRecord(${index})" title="削除">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
 }
 
 function addHistoryRecord() {
@@ -108,18 +97,19 @@ function addHistoryRecord() {
     
     if(!asset.maintenance) asset.maintenance = [];
     
-    asset.maintenance.push({
-        date: date,
-        event: event
-    });
-    
-    // フォームをリセット
-    document.getElementById('newHistoryDate').value = new Date().toISOString().split('T')[0];
+    asset.maintenance.push({ date, event });
+    recordUsage('events', event); // 次回の入力候補として学習
+
+    // フォームをリセット（日付は今日のまま残し、続けて入力できるようにする）
+    document.getElementById('newHistoryDate').value = todayISO();
     document.getElementById('newHistoryEvent').value = '';
-    
+    document.getElementById('newHistoryEvent').focus();
+
     renderHistoryRecords();
+    refreshEventSuggestions();
+    refreshCurrentView();
     showToast('履歴を追加しました');
-    autoSaveData(); // 自動保存
+    autoSaveData();
 }
 
 function editHistoryRecord(index) {
@@ -185,8 +175,9 @@ function deleteHistoryRecord(index) {
     
     asset.maintenance.splice(index, 1);
     renderHistoryRecords();
+    refreshCurrentView();
     showToast('履歴を削除しました');
-    autoSaveData(); // 自動保存
+    autoSaveData();
 }
 
 function sortHistory(order) {
@@ -212,17 +203,13 @@ function renderScheduleRecords() {
     
     if(asset.scheduledPlans.length === 0) {
         container.innerHTML = `
-            <div style="padding:60px 20px; text-align:center; color:var(--text-sub);">
-                <i class="fa-regular fa-calendar-check" style="font-size:3rem; margin-bottom:12px; display:block; opacity:0.3;"></i>
-                <div style="font-size:0.95rem;">周期計画はまだ登録されていません</div>
-                <div style="font-size:0.85rem; margin-top:4px; opacity:0.7;">上のフォームから追加してください</div>
-            </div>
-        `;
+            <div class="empty-state">
+                <i class="fa-regular fa-calendar-check empty-state-icon"></i>
+                <div class="empty-state-title">周期計画はまだありません</div>
+                <div class="empty-state-desc">点検や交換の予定を登録すると、ダッシュボードの「要対応」に自動で並びます</div>
+            </div>`;
         return;
     }
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     
     // ソート
     const sortedRecords = [...asset.scheduledPlans].sort((a, b) => {
@@ -233,91 +220,106 @@ function renderScheduleRecords() {
         }
     });
     
-    // リスト表示
-    let html = '<div style="padding:0;">';
-    sortedRecords.forEach((record, originalIndex) => {
+    // リスト表示（1行1件。期限の状態を左端の色と右側の残日数で示す）
+    container.innerHTML = sortedRecords.map(record => {
         const index = asset.scheduledPlans.indexOf(record);
-        const isEditing = record._editing;
-        const planDate = new Date(record.date);
-        planDate.setHours(0, 0, 0, 0);
-        
-        let statusInfo = '';
-        let isOverdue = false;
-        
-        if(record.cycle && planDate <= today) {
-            const daysPassed = Math.floor((today - planDate) / (1000 * 60 * 60 * 24));
-            if(daysPassed > record.cycle) {
-                const overdueDays = daysPassed - record.cycle;
-                statusInfo = `<span style="color: var(--danger); font-weight: 600; font-size:0.85rem;"><i class="fa-solid fa-exclamation-triangle"></i> 周期遅れ: ${overdueDays}日</span>`;
-                isOverdue = true;
-            } else {
-                const remainingDays = record.cycle - daysPassed;
-                statusInfo = `<span style="color: var(--success); font-size:0.85rem;"><i class="fa-solid fa-check-circle"></i> 残り: ${remainingDays}日</span>`;
-            }
-        } else if(planDate > today) {
-            const daysUntil = Math.floor((planDate - today) / (1000 * 60 * 60 * 24));
-            statusInfo = `<span style="color: var(--primary); font-size:0.85rem;"><i class="fa-solid fa-clock"></i> 予定まで: ${daysUntil}日</span>`;
-        }
-        
-        const borderStyle = isOverdue ? 'border-left:4px solid var(--danger);' : '';
-        
-        html += `
-            <div style="padding:16px 20px; ${borderStyle} border-bottom:1px solid #f1f5f9; display:flex; gap:16px; align-items:start;" id="schedule-item-${index}">
-                ${isEditing ? `
-                    <div style="flex:1;">
-                        <div style="display:grid; grid-template-columns: 180px 150px 1fr; gap:12px;">
-                            <div>
-                                <label style="font-size:0.8rem; font-weight:600; color:var(--text-sub); display:block; margin-bottom:4px;">日時</label>
-                                <input type="date" id="edit-schedule-date-${index}" value="${record.date}" class="input" style="font-size:0.9rem;">
-                            </div>
-                            <div>
-                                <label style="font-size:0.8rem; font-weight:600; color:var(--text-sub); display:block; margin-bottom:4px;">周期 (日)</label>
-                                <input type="number" id="edit-schedule-cycle-${index}" value="${record.cycle || ''}" placeholder="例: 30" min="1" class="input" style="font-size:0.9rem;">
-                            </div>
-                            <div>
-                                <label style="font-size:0.8rem; font-weight:600; color:var(--text-sub); display:block; margin-bottom:4px;">イベント内容</label>
-                                <input type="text" id="edit-schedule-event-${index}" value="${record.event}" class="input" style="font-size:0.9rem;">
-                            </div>
-                        </div>
-                    </div>
-                    <div style="flex:0 0 auto; display:flex; gap:4px;">
+        const days = daysUntil(record.date);
+        const isOverdue = days < 0;
+
+        if(record._editing) {
+            return `
+                <div class="record-row" id="schedule-item-${index}">
+                    <input type="date" id="edit-schedule-date-${index}" value="${escapeHTML(record.date)}" class="input" style="flex:0 0 140px;">
+                    <input type="number" id="edit-schedule-cycle-${index}" value="${record.cycle || ''}" placeholder="周期" min="1" class="input" style="flex:0 0 90px;">
+                    <input type="text" id="edit-schedule-event-${index}" value="${escapeHTML(record.event)}" class="input" style="flex:1;" list="eventSuggestions">
+                    <div style="display:flex; gap:4px; flex-shrink:0;">
                         <button class="btn btn-primary btn-sm" onclick="saveScheduleRecord(${index})" title="保存">
                             <i class="fa-solid fa-check"></i>
                         </button>
-                        <button class="btn btn-outline btn-sm" onclick="cancelEditSchedule(${index})" title="キャンセル">
+                        <button class="btn btn-outline btn-sm" onclick="cancelEditSchedule(${index})" title="取り消し">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
                     </div>
-                ` : `
-                    <div style="flex:0 0 160px;">
-                        <div style="display:flex; flex-direction:column; gap:2px;">
-                            <div style="font-size:0.95rem; font-weight:600; color:var(--text-main);">${record.date}</div>
-                            <div style="font-size:0.75rem; color:var(--text-sub);">${formatDateRelative(record.date)}</div>
-                        </div>
-                    </div>
-                    <div style="flex:1;">
-                        <div style="font-size:0.9rem; color:var(--text-main); margin-bottom:4px;">${record.event}</div>
-                        ${record.cycle ? `
-                            <div style="font-size:0.8rem; color:var(--text-sub); margin-top:6px;">
-                                <i class="fa-solid fa-redo" style="margin-right:4px;"></i> 周期: ${record.cycle}日 / ${statusInfo}
-                            </div>
-                        ` : ''}
-                    </div>
-                    <div style="flex:0 0 auto; display:flex; gap:4px;">
-                        <button class="btn btn-ghost btn-icon-only" onclick="editScheduleRecord(${index})" title="編集">
-                            <i class="fa-solid fa-pen"></i>
-                        </button>
-                        <button class="btn btn-ghost btn-icon-only" style="color:var(--danger);" onclick="deleteScheduleRecord(${index})" title="削除">
-                            <i class="fa-solid fa-trash"></i>
-                        </button>
-                    </div>
-                `}
-            </div>
-        `;
+                </div>`;
+        }
+
+        const tone = isOverdue ? 'var(--danger)' : days <= 7 ? 'var(--warning)' : 'var(--text-sub)';
+
+        return `
+            <div class="record-row ${isOverdue ? 'is-overdue' : ''}" id="schedule-item-${index}">
+                <div class="record-date">
+                    ${escapeHTML(record.date)}
+                    <span class="record-rel" style="color:${tone};">${escapeHTML(formatDayDelta(days))}</span>
+                </div>
+                <div class="record-body">
+                    ${escapeHTML(record.event)}
+                    ${record.cycle ? `<span class="record-meta"><i class="fa-solid fa-rotate"></i> ${record.cycle}日ごと</span>` : ''}
+                </div>
+                <div class="record-actions">
+                    <button class="btn btn-outline btn-sm" onclick="completeScheduleRecord(${index})"
+                            title="今日実施したものとして履歴に記録し、次回予定へ進めます">
+                        <i class="fa-solid fa-check"></i> 実施済み
+                    </button>
+                    <button class="btn btn-ghost btn-sm btn-icon-only" onclick="editScheduleRecord(${index})" title="編集">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <button class="btn btn-danger-ghost btn-sm btn-icon-only" onclick="deleteScheduleRecord(${index})" title="削除">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+/**
+ * 周期計画を「今日実施した」ものとして片付ける
+ *
+ * 実務では「点検した → 履歴に記録 → 次回予定を先に送る」が必ずセットで発生する。
+ * 3画面を行き来する代わりに、1クリックで完了できるようにしている。
+ * @param {number} index
+ */
+function completeScheduleRecord(index) {
+    const asset = assets.find(a => a.id === editingAssetId);
+    if(!asset || !asset.scheduledPlans[index]) return;
+
+    const plan = asset.scheduledPlans[index];
+    const before = { date: plan.date };
+
+    // 1. 実施内容を履歴に残す
+    if(!asset.maintenance) asset.maintenance = [];
+    const historyRecord = { date: todayISO(), event: plan.event };
+    asset.maintenance.push(historyRecord);
+    recordUsage('events', plan.event);
+
+    // 2. 周期があれば次回へ送り、無ければ予定そのものを消化する
+    let message;
+    if(plan.cycle) {
+        plan.date = addDaysISO(todayISO(), plan.cycle);
+        message = `履歴に記録し、次回を ${plan.date} に更新しました`;
+    } else {
+        asset.scheduledPlans.splice(index, 1);
+        message = '履歴に記録し、予定を完了しました';
+    }
+
+    renderScheduleRecords();
+    renderHistoryRecords();
+    refreshEventSuggestions();
+    refreshCurrentView();
+    autoSaveData();
+
+    showToast(message, 'success', {
+        label: '元に戻す',
+        onClick: () => {
+            const hIndex = asset.maintenance.indexOf(historyRecord);
+            if(hIndex >= 0) asset.maintenance.splice(hIndex, 1);
+            if(plan.cycle) plan.date = before.date;
+            else asset.scheduledPlans.splice(index, 0, plan);
+            renderScheduleRecords();
+            renderHistoryRecords();
+            refreshCurrentView();
+            autoSaveData();
+        }
     });
-    html += '</div>';
-    
-    container.innerHTML = html;
 }
 
 function addScheduleRecord() {
@@ -341,23 +343,21 @@ function addScheduleRecord() {
     if(!asset.scheduledPlans) asset.scheduledPlans = [];
     
     asset.scheduledPlans.push({
-        date: date,
-        event: event,
+        date,
+        event,
         cycle: cycle ? parseInt(cycle) : null
     });
-    
-    document.getElementById('newScheduleDate').value = new Date().toISOString().split('T')[0];
+    recordUsage('events', event);
+
+    document.getElementById('newScheduleDate').value = todayISO();
     document.getElementById('newScheduleEvent').value = '';
     document.getElementById('newScheduleCycle').value = '';
-    
+
     renderScheduleRecords();
+    refreshEventSuggestions();
+    refreshCurrentView();
     showToast('周期計画を追加しました');
-    
-    // カレンダービューの場合は更新
-    if(assetViewMode === 'calendar') {
-        refreshCurrentView();
-    }
-    autoSaveData(); // 自動保存
+    autoSaveData();
 }
 
 function editScheduleRecord(index) {
@@ -399,13 +399,9 @@ function saveScheduleRecord(index) {
     delete asset.scheduledPlans[index]._originalCycle;
     
     renderScheduleRecords();
+    refreshCurrentView();
     showToast('周期計画を更新しました');
-    
-    // カレンダービューの場合は更新
-    if(assetViewMode === 'calendar') {
-        refreshCurrentView();
-    }
-    autoSaveData(); // 自動保存
+    autoSaveData();
 }
 
 function cancelEditSchedule(index) {
@@ -431,30 +427,14 @@ function deleteScheduleRecord(index) {
     
     asset.scheduledPlans.splice(index, 1);
     renderScheduleRecords();
+    refreshCurrentView();
     showToast('周期計画を削除しました');
-    
-    // カレンダービューの場合は更新
-    if(assetViewMode === 'calendar') {
-        refreshCurrentView();
-    }
-    autoSaveData(); // 自動保存
+    autoSaveData();
 }
 
 function sortSchedule(order) {
     scheduleSortOrder = order;
-    
-    const btnDesc = document.getElementById('sortScheduleDescBtn');
-    const btnAsc = document.getElementById('sortScheduleAscBtn');
-    
-    if(order === 'desc') {
-        btnDesc.className = 'btn btn-outline btn-sm';
-        btnAsc.className = 'btn btn-ghost btn-sm';
-    } else {
-        btnAsc.className = 'btn btn-outline btn-sm';
-        btnDesc.className = 'btn btn-ghost btn-sm';
-    }
-    
-    renderScheduleRecords();
+    renderScheduleRecords(); // ボタンの状態も renderScheduleRecords 側で同期される
 }
 
 

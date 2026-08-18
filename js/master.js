@@ -14,13 +14,15 @@ let cfEditIndex = null;
 // =============================================================================
 // フィールド種別 UI 定義
 // =============================================================================
+// color は `${ui.color}1a` のように不透明度を連結して使うため、
+// CSS変数ではなく16進値で保持する（値は css/base.css のトークンと同一）
 const FIELD_TYPE_UI = {
-    text:     { icon: 'fa-font',           label: 'テキスト',  desc: '短い文字を入力する欄',     color: '#3b82f6' },
-    number:   { icon: 'fa-hashtag',        label: '数値',      desc: '数字のみを入力する欄',     color: '#10b981' },
-    date:     { icon: 'fa-calendar-days',  label: '日付',      desc: 'カレンダーから日付を選ぶ', color: '#f59e0b' },
-    select:   { icon: 'fa-list-ul',        label: '選択肢',    desc: 'リストから一つを選ぶ',     color: '#8b5cf6' },
-    checkbox: { icon: 'fa-square-check',   label: 'チェック',  desc: 'はい／いいえで回答する',   color: '#ef4444' },
-    textarea: { icon: 'fa-align-left',     label: 'メモ欄',    desc: '複数行のテキストを入力',   color: '#6366f1' },
+    text:     { icon: 'fa-font',           label: 'テキスト',  desc: '短い文字を入力する欄',     color: '#275388' },
+    number:   { icon: 'fa-hashtag',        label: '数値',      desc: '数字のみを入力する欄',     color: '#1c7a4c' },
+    date:     { icon: 'fa-calendar-days',  label: '日付',      desc: 'カレンダーから日付を選ぶ', color: '#a86a09' },
+    select:   { icon: 'fa-list-ul',        label: '選択肢',    desc: 'リストから一つを選ぶ',     color: '#4e5867' },
+    checkbox: { icon: 'fa-square-check',   label: 'チェック',  desc: 'はい／いいえで回答する',   color: '#b03024' },
+    textarea: { icon: 'fa-align-left',     label: 'メモ欄',    desc: '複数行のテキストを入力',   color: '#35659c' },
 };
 
 // =============================================================================
@@ -59,7 +61,7 @@ function injectCFStyles() {
             min-width: 0;
             overflow-y: auto;
             padding: 24px 20px 32px;
-            background: #f8fafc;
+            background: var(--surface-sunken);
         }
         .cf-right-pane {
             width: 440px;
@@ -75,7 +77,7 @@ function injectCFStyles() {
         .cf-right-pane-header {
             padding: 16px 20px;
             border-bottom: 1px solid var(--border);
-            background: #f8fafc;
+            background: var(--surface-sunken);
             flex-shrink: 0;
         }
         .cf-right-pane-body {
@@ -86,16 +88,16 @@ function injectCFStyles() {
         /* ── 選択中タグカードのハイライト ── */
         .nested-card.cf-selected {
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+            box-shadow: 0 0 0 3px rgba(39,83,136,0.12);
         }
         .nested-card.cf-selected > .nested-card-header {
-            background: #eff6ff;
+            background: var(--primary-bg);
         }
         /* ── フィールドアイテム ── */
         .cf-field-item {
             display: flex; align-items: center; gap: 12px;
             padding: 12px 14px;
-            background: #f8fafc;
+            background: var(--surface-sunken);
             border: 1px solid var(--border);
             border-radius: 10px;
             transition: all 0.15s;
@@ -128,14 +130,14 @@ function injectCFStyles() {
         .cf-preset-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
         .cf-preset-chip {
             display: inline-flex; align-items: center; gap: 5px;
-            padding: 6px 13px; background: #f1f5f9;
-            border: 1px solid #e2e8f0; border-radius: 20px;
+            padding: 6px 13px; background: var(--surface-muted);
+            border: 1px solid var(--border); border-radius: 20px;
             font-size: 0.82rem; cursor: pointer; color: #374151;
             transition: all 0.15s; font-family: inherit;
         }
         .cf-preset-chip:hover {
             background: var(--primary); border-color: var(--primary);
-            color: #fff; box-shadow: 0 2px 8px rgba(37,99,235,0.25);
+            color: #fff; box-shadow: 0 2px 8px rgba(39,83,136,0.25);
             transform: translateY(-1px);
         }
         .cf-preset-chip:hover i { color: #fff !important; }
@@ -145,15 +147,15 @@ function injectCFStyles() {
             margin-bottom: 4px;
         }
         .cf-type-card {
-            padding: 12px 8px; border: 2px solid #e2e8f0;
+            padding: 12px 8px; border: 2px solid var(--border);
             border-radius: 10px; cursor: pointer;
             text-align: center; transition: all 0.15s;
             background: #fff; user-select: none;
         }
-        .cf-type-card:hover { border-color: #93c5fd; background: #eff6ff; }
+        .cf-type-card:hover { border-color: var(--p-300); background: var(--primary-bg); }
         .cf-type-card.selected {
-            border-color: var(--primary); background: #eff6ff;
-            box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+            border-color: var(--primary); background: var(--primary-bg);
+            box-shadow: 0 0 0 3px rgba(39,83,136,0.12);
         }
         .cf-type-card.cf-type-disabled { pointer-events: none; }
         .cf-type-card.cf-type-disabled:not(.selected) { opacity: 0.3; }
@@ -162,7 +164,7 @@ function injectCFStyles() {
         .cf-type-card-desc  { font-size: 0.64rem; color: var(--text-sub); line-height: 1.3; margin-top: 2px; }
         /* ── プレビューボックス ── */
         .cf-preview-box {
-            padding: 16px; background: #f8fafc;
+            padding: 16px; background: var(--surface-sunken);
             border: 1px solid var(--border); border-radius: 10px;
             margin-top: 16px;
         }
@@ -178,12 +180,12 @@ function injectCFStyles() {
         .preview-input {
             width: 100%; padding: 8px 10px; border: 1px solid #d1d5db;
             border-radius: 6px; font-size: 0.88rem; background: #fff;
-            box-sizing: border-box; font-family: inherit; color: #9ca3af;
+            box-sizing: border-box; font-family: inherit; color: var(--text-faint);
         }
         select.preview-input { appearance: auto; cursor: default; }
         textarea.preview-input { resize: none; min-height: 64px; }
         .preview-hint {
-            font-size: 0.78rem; color: #d97706; margin-top: 6px;
+            font-size: 0.78rem; color: var(--warning); margin-top: 6px;
             display: flex; align-items: center; gap: 4px;
         }
         .cf-preview-type-badge {
@@ -274,15 +276,15 @@ function renderMasterCats() {
         btn.className = `cat-btn ${currentMasterId === m.id ? 'active' : ''}`;
         btn.style.cssText = 'display:flex;align-items:center;gap:8px;padding:12px 16px;cursor:pointer;border-radius:8px;transition:all 0.2s;margin-bottom:4px;';
         if(currentMasterId === m.id) {
-            btn.style.background = 'linear-gradient(135deg,#3b82f6 0%,#2563eb 100%)';
+            btn.style.background = 'var(--primary)';
             btn.style.color      = '#fff';
-            btn.style.boxShadow  = '0 2px 8px rgba(59,130,246,0.3)';
+            btn.style.boxShadow  = 'var(--shadow-sm)';
         } else {
-            btn.style.background = '#f8fafc';
-            btn.style.color      = '#334155';
+            btn.style.background = 'var(--surface-sunken)';
+            btn.style.color      = 'var(--n-700)';
         }
-        btn.onmouseover = () => { if(currentMasterId !== m.id) btn.style.background = '#e2e8f0'; };
-        btn.onmouseout  = () => { if(currentMasterId !== m.id) btn.style.background = '#f8fafc'; };
+        btn.onmouseover = () => { if(currentMasterId !== m.id) btn.style.background = 'var(--border)'; };
+        btn.onmouseout  = () => { if(currentMasterId !== m.id) btn.style.background = 'var(--surface-sunken)'; };
 
         const nameSpan = document.createElement('span');
         nameSpan.textContent = m.name;
@@ -305,11 +307,11 @@ function renderMasterCats() {
 
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'btn btn-icon-only';
-            deleteBtn.style.cssText = 'padding:6px;width:28px;height:28px;border-radius:6px;transition:all 0.2s;background:rgba(239,68,68,0.15);color:#fecaca;';
+            deleteBtn.style.cssText = 'padding:6px;width:28px;height:28px;border-radius:6px;transition:all 0.2s;background:rgba(176,48,36,0.15);color:var(--r-200);';
             deleteBtn.innerHTML = '<i class="fa-solid fa-trash" style="font-size:0.75rem;"></i>';
             deleteBtn.title = 'マスタを削除';
-            deleteBtn.onmouseover = () => { deleteBtn.style.background='rgba(239,68,68,0.25)'; deleteBtn.style.color='#fff'; };
-            deleteBtn.onmouseout  = () => { deleteBtn.style.background='rgba(239,68,68,0.15)'; deleteBtn.style.color='#fecaca'; };
+            deleteBtn.onmouseover = () => { deleteBtn.style.background='rgba(176,48,36,0.25)'; deleteBtn.style.color='#fff'; };
+            deleteBtn.onmouseout  = () => { deleteBtn.style.background='rgba(176,48,36,0.15)'; deleteBtn.style.color='var(--r-200)'; };
             deleteBtn.onclick = (e) => { e.stopPropagation(); deleteMaster(m.id); };
 
             actionsDiv.appendChild(editBtn);
@@ -323,7 +325,7 @@ function renderMasterCats() {
         const chevron = document.createElement('i');
         chevron.className = 'fa-solid fa-chevron-right';
         chevron.style.cssText = 'font-size:0.7rem;flex-shrink:0;transition:transform 0.2s;';
-        chevron.style.color = currentMasterId === m.id ? '#fff' : '#94a3b8';
+        chevron.style.color = currentMasterId === m.id ? '#fff' : 'var(--text-faint)';
         if(currentMasterId === m.id) chevron.style.transform = 'translateX(2px)';
         btn.appendChild(chevron);
 
@@ -405,24 +407,24 @@ function _buildTagTreeInto(pane) {
     const helpWrap   = document.createElement('div');
     helpWrap.style.cssText = 'margin-bottom:16px;';
     const helpToggle = document.createElement('div');
-    helpToggle.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;transition:background 0.2s;font-size:0.88rem;color:#475569;';
-    helpToggle.onmouseover = () => helpToggle.style.background = '#f1f5f9';
+    helpToggle.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:background 0.2s;font-size:0.88rem;color:var(--n-600);';
+    helpToggle.onmouseover = () => helpToggle.style.background = 'var(--surface-muted)';
     helpToggle.onmouseout  = () => helpToggle.style.background = '#fff';
     helpToggle.innerHTML = `
-        <i class="fa-solid fa-info-circle" style="color:#3b82f6;font-size:0.9rem;"></i>
+        <i class="fa-solid fa-info-circle" style="color:var(--primary);font-size:0.9rem;"></i>
         <span style="font-weight:600;">操作方法と階層構造のルール</span>
         <i class="fa-solid fa-chevron-down" id="helpChevron"
-           style="margin-left:auto;color:#94a3b8;transition:transform 0.2s;font-size:0.75rem;"></i>
+           style="margin-left:auto;color:var(--text-faint);transition:transform 0.2s;font-size:0.75rem;"></i>
     `;
     const helpContent = document.createElement('div');
-    helpContent.style.cssText = 'display:none;margin-top:8px;padding:16px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;font-size:0.85rem;';
+    helpContent.style.cssText = 'display:none;margin-top:8px;padding:16px;background:#fff;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;';
     helpContent.innerHTML = `
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
             <div>
-                <div style="font-weight:700;margin-bottom:8px;color:#475569;display:flex;align-items:center;gap:6px;">
-                    <i class="fa-solid fa-pencil" style="color:#8b5cf6;"></i>基本操作
+                <div style="font-weight:700;margin-bottom:8px;color:var(--n-600);display:flex;align-items:center;gap:6px;">
+                    <i class="fa-solid fa-pencil" style="color:var(--n-600);"></i>基本操作
                 </div>
-                <ul style="margin:0;padding-left:16px;color:#64748b;line-height:1.9;">
+                <ul style="margin:0;padding-left:16px;color:var(--text-sub);line-height:1.9;">
                     <li><strong>タグ名編集:</strong> タグ名をクリック</li>
                     <li><strong>階層移動:</strong> ドラッグ&amp;ドロップ</li>
                     <li><strong>子要素追加:</strong> 「+」ボタン</li>
@@ -430,20 +432,20 @@ function _buildTagTreeInto(pane) {
                 </ul>
             </div>
             <div>
-                <div style="font-weight:700;margin-bottom:8px;color:#475569;display:flex;align-items:center;gap:6px;">
-                    <i class="fa-solid fa-sitemap" style="color:#3b82f6;"></i>階層のルール
+                <div style="font-weight:700;margin-bottom:8px;color:var(--n-600);display:flex;align-items:center;gap:6px;">
+                    <i class="fa-solid fa-sitemap" style="color:var(--primary);"></i>階層のルール
                 </div>
-                <ul style="margin:0;padding-left:16px;color:#64748b;line-height:1.9;">
+                <ul style="margin:0;padding-left:16px;color:var(--text-sub);line-height:1.9;">
                     <li>同じ階層レベルなら複数の親を持てる</li>
                     <li>階層を飛ばす接続は自動調整</li>
                     <li>循環参照は作成不可</li>
                 </ul>
             </div>
             <div>
-                <div style="font-weight:700;margin-bottom:8px;color:#475569;display:flex;align-items:center;gap:6px;">
+                <div style="font-weight:700;margin-bottom:8px;color:var(--n-600);display:flex;align-items:center;gap:6px;">
                     <i class="fa-solid fa-sliders" style="color:var(--primary);"></i>固有の入力項目とは
                 </div>
-                <div style="color:#64748b;line-height:1.7;">
+                <div style="color:var(--text-sub);line-height:1.7;">
                     <i class="fa-solid fa-sliders" style="color:var(--primary);"></i> ボタンで右ペインを開くと、そのタグが選択された資産にだけ表示される専用の入力欄を設定できます。
                 </div>
             </div>
@@ -489,7 +491,7 @@ function _buildTagTreeInto(pane) {
 
         header.ondragstart = (e) => { e.dataTransfer.setData('text/id', tag.id); wrapper.classList.add('dragging'); };
         header.ondragend   = () => wrapper.classList.remove('dragging');
-        header.ondragover  = (e) => { e.preventDefault(); header.style.background = bgColor !== 'transparent' ? bgColor : '#eff6ff'; };
+        header.ondragover  = (e) => { e.preventDefault(); header.style.background = bgColor !== 'transparent' ? bgColor : 'var(--primary-bg)'; };
         header.ondragleave = () => { header.style.background = bgColor; };
         header.ondrop      = (e) => {
             e.preventDefault();
@@ -500,11 +502,11 @@ function _buildTagTreeInto(pane) {
 
         const uniqueId  = parentId !== null ? `tag-name-${tag.id}-p${parentId}` : `tag-name-${tag.id}`;
         const multiIcon = multiParentNodes.has(tag.id)
-            ? `<i class="fa-solid fa-link" style="color:#3b82f6;font-size:0.75rem;margin-right:4px;" title="複数の親に所属"></i>` : '';
+            ? `<i class="fa-solid fa-link" style="color:var(--primary);font-size:0.75rem;margin-right:4px;" title="複数の親に所属"></i>` : '';
         const cfCount = (tag.customFields || []).length;
 
         header.innerHTML = `
-            <i class="fa-solid fa-grip-vertical" style="color:#cbd5e1;"></i>
+            <i class="fa-solid fa-grip-vertical" style="color:var(--border-strong);"></i>
             ${multiIcon}
             <span id="${uniqueId}" data-tag-id="${tag.id}"
                   style="font-weight:600;cursor:pointer;padding:4px 8px;border-radius:4px;transition:background 0.15s;flex:1;min-width:0;"
@@ -545,7 +547,7 @@ function _buildTagTreeInto(pane) {
     roots.forEach(r => pane.appendChild(createCard(r)));
 
     const dropZone = document.createElement('div');
-    dropZone.style.cssText = 'padding:20px;border:2px dashed #cbd5e1;border-radius:8px;text-align:center;color:#94a3b8;margin-top:20px;background:#fafbfc;font-size:0.88rem;';
+    dropZone.style.cssText = 'padding:20px;border:2px dashed var(--border-strong);border-radius:8px;text-align:center;color:var(--text-faint);margin-top:20px;background:var(--surface-sunken);font-size:0.88rem;';
     dropZone.innerText = 'ここにドロップしてルート（親なし）にする';
     dropZone.ondragover = (e) => e.preventDefault();
     dropZone.ondrop     = (e) => { e.preventDefault(); makeRoot(parseInt(e.dataTransfer.getData('text/id'))); };
@@ -641,13 +643,13 @@ function _renderRightPaneCFList(tagId) {
             <!-- プリセット -->
             <div style="margin-bottom:22px;">
                 <div class="cf-section-label">
-                    <i class="fa-solid fa-bolt" style="color:#f59e0b;"></i> テンプレートから追加
+                    <i class="fa-solid fa-bolt" style="color:var(--warning);"></i> テンプレートから追加
                 </div>
                 <div class="cf-preset-chips">
                     ${FIELD_PRESETS.map((p, i) => `
                         <button class="cf-preset-chip" onclick="applyFieldPreset(${i},${tagId})">
                             <i class="fa-solid ${p.icon}"
-                               style="font-size:0.78rem;color:${(FIELD_TYPE_UI[p.type]||{}).color||'var(--primary)'};"></i>
+                               style="font-size:0.78rem;color:${(FIELD_TYPE_UI[p.type]||{}).color||'#275388'};"></i>
                             ${p.label}
                         </button>
                     `).join('')}
@@ -753,7 +755,7 @@ function _renderRightPaneCFForm(tagId, fieldIndex) {
             </div>
             ${isEdit ? `
                 <div style="margin-top:8px;font-size:0.78rem;color:var(--text-sub);
-                            padding:6px 10px;background:#f1f5f9;border-radius:6px;">
+                            padding:6px 10px;background:var(--surface-muted);border-radius:6px;">
                     入力の種類は追加後に変更できません。
                 </div>` : ''}
         </div>
@@ -885,7 +887,7 @@ function _previewHTML(field) {
         }
         case 'checkbox':
             inputHTML = `
-                <label style="display:flex;align-items:center;gap:8px;cursor:default;color:#9ca3af;font-size:0.9rem;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:default;color:var(--text-faint);font-size:0.9rem;">
                     <input type="checkbox" disabled> はい（チェックする）
                 </label>`;
             break;
@@ -987,7 +989,7 @@ function _renderTypeOptions(field) {
     return `
         <div class="type-options-section" style="margin-bottom:16px;">
             <div class="type-options-section-header">
-                <i class="fa-solid ${ui?.icon||'fa-sliders'}" style="color:${ui?.color||'var(--primary)'};"></i>
+                <i class="fa-solid ${ui?.icon||'fa-sliders'}" style="color:${ui?.color||'#275388'};"></i>
                 「${ui?.label || field.type}」の詳細設定
             </div>
             ${inner}
@@ -1187,25 +1189,25 @@ function renderAssetsListView() {
     const helpSection  = document.createElement('div');
     helpSection.style.cssText = 'margin-bottom:16px;';
     const helpToggle   = document.createElement('div');
-    helpToggle.style.cssText = 'display:flex;align-items:center;gap:8px;padding:12px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;transition:background 0.2s;';
-    helpToggle.onmouseover = () => helpToggle.style.background = '#f1f5f9';
-    helpToggle.onmouseout  = () => helpToggle.style.background = '#f8fafc';
+    helpToggle.style.cssText = 'display:flex;align-items:center;gap:8px;padding:12px 16px;background:var(--surface-sunken);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:background 0.2s;';
+    helpToggle.onmouseover = () => helpToggle.style.background = 'var(--surface-muted)';
+    helpToggle.onmouseout  = () => helpToggle.style.background = 'var(--surface-sunken)';
     helpToggle.innerHTML = `
-        <i class="fa-solid fa-info-circle" style="color:#3b82f6;font-size:1rem;"></i>
-        <span style="font-weight:600;color:#1e293b;font-size:0.95rem;">資産構成管理について</span>
+        <i class="fa-solid fa-info-circle" style="color:var(--primary);font-size:1rem;"></i>
+        <span style="font-weight:600;color:var(--n-800);font-size:0.95rem;">資産構成管理について</span>
         <i class="fa-solid fa-chevron-down" id="assetHelpChevron"
-           style="margin-left:auto;color:#64748b;transition:transform 0.2s;"></i>
+           style="margin-left:auto;color:var(--text-sub);transition:transform 0.2s;"></i>
     `;
     const helpContent = document.createElement('div');
-    helpContent.style.cssText = 'display:none;margin-top:12px;padding:16px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;';
+    helpContent.style.cssText = 'display:none;margin-top:12px;padding:16px;background:#fff;border:1px solid var(--border);border-radius:8px;';
     helpContent.innerHTML = `
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">
-            <div><div style="font-weight:600;margin-bottom:10px;color:#475569;font-size:0.9rem;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-sitemap" style="color:#8b5cf6;"></i>親子関係とは</div>
-            <ul style="margin:0;padding-left:18px;color:#64748b;line-height:1.8;font-size:0.88rem;"><li>設備を構成する部品・パーツの管理</li><li>設置場所と資産の関係管理</li></ul></div>
-            <div><div style="font-weight:600;margin-bottom:10px;color:#475569;font-size:0.9rem;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-pencil" style="color:#3b82f6;"></i>基本操作</div>
-            <ul style="margin:0;padding-left:18px;color:#64748b;line-height:1.8;font-size:0.88rem;"><li><strong>親資産を設定:</strong> カードをドラッグして親にドロップ</li><li><strong>解除:</strong> 「解除」ボタンをクリック</li></ul></div>
-            <div><div style="font-weight:600;margin-bottom:10px;color:#475569;font-size:0.9rem;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;"></i>制約事項</div>
-            <ul style="margin:0;padding-left:18px;color:#64748b;line-height:1.8;font-size:0.88rem;"><li>1つの資産は1つの親のみ持てる</li><li>循環参照・子孫を親に設定することは不可</li></ul></div>
+            <div><div style="font-weight:600;margin-bottom:10px;color:var(--n-600);font-size:0.9rem;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-sitemap" style="color:var(--n-600);"></i>親子関係とは</div>
+            <ul style="margin:0;padding-left:18px;color:var(--text-sub);line-height:1.8;font-size:0.88rem;"><li>設備を構成する部品・パーツの管理</li><li>設置場所と資産の関係管理</li></ul></div>
+            <div><div style="font-weight:600;margin-bottom:10px;color:var(--n-600);font-size:0.9rem;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-pencil" style="color:var(--primary);"></i>基本操作</div>
+            <ul style="margin:0;padding-left:18px;color:var(--text-sub);line-height:1.8;font-size:0.88rem;"><li><strong>親資産を設定:</strong> カードをドラッグして親にドロップ</li><li><strong>解除:</strong> 「解除」ボタンをクリック</li></ul></div>
+            <div><div style="font-weight:600;margin-bottom:10px;color:var(--n-600);font-size:0.9rem;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i>制約事項</div>
+            <ul style="margin:0;padding-left:18px;color:var(--text-sub);line-height:1.8;font-size:0.88rem;"><li>1つの資産は1つの親のみ持てる</li><li>循環参照・子孫を親に設定することは不可</li></ul></div>
         </div>
     `;
     helpToggle.onclick = () => {
@@ -1229,7 +1231,7 @@ function renderAssetsListView() {
         header.draggable = true;
         header.ondragstart = (e) => { e.dataTransfer.setData('text/assetId', asset.id); wrapper.classList.add('dragging'); };
         header.ondragend   = () => wrapper.classList.remove('dragging');
-        header.ondragover  = (e) => { e.preventDefault(); header.style.background = '#eff6ff'; };
+        header.ondragover  = (e) => { e.preventDefault(); header.style.background = 'var(--primary-bg)'; };
         header.ondragleave = () => { header.style.background = 'transparent'; };
         header.ondrop      = (e) => {
             e.preventDefault(); header.style.background = 'transparent';
@@ -1238,7 +1240,7 @@ function renderAssetsListView() {
         };
         const statusBadges = renderStatusBadgesHTML(asset.status, 'font-size:0.7rem;');
         header.innerHTML = `
-            <i class="fa-solid fa-grip-vertical" style="color:#cbd5e1;"></i>
+            <i class="fa-solid fa-grip-vertical" style="color:var(--border-strong);"></i>
             <span style="font-weight:600;cursor:pointer;padding:4px 8px;border-radius:4px;transition:background 0.15s;"
                   onclick="closeModal('masterModal');openAssetModal('${asset.id}')"
                   onmouseover="this.style.background='rgba(0,0,0,0.05)'"
@@ -1272,7 +1274,7 @@ function renderAssetsListView() {
     } else {
         rootAssets.forEach(r => mainArea.appendChild(createAssetCard(r)));
         const dz = document.createElement('div');
-        dz.style.cssText = 'padding:24px;border:2px dashed #cbd5e1;border-radius:8px;text-align:center;color:#94a3b8;margin-top:20px;background:#fafbfc;font-size:0.9rem;';
+        dz.style.cssText = 'padding:24px;border:2px dashed var(--border-strong);border-radius:8px;text-align:center;color:var(--text-faint);margin-top:20px;background:var(--surface-sunken);font-size:0.9rem;';
         dz.innerText = 'ここにドロップして親なし（トップレベル）にする';
         dz.ondragover = (e) => e.preventDefault();
         dz.ondrop     = (e) => { e.preventDefault(); unlinkAssetParent(e.dataTransfer.getData('text/assetId')); };

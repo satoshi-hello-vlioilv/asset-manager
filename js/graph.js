@@ -738,7 +738,7 @@ function editTagNameInGraph(tagId, nodeElement) {
         background: #fff;
         color: var(--text);
         outline: none;
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        box-shadow: 0 0 0 3px rgba(39, 83, 136, 0.2);
     `;
     
     // 編集完了時の処理
@@ -985,7 +985,7 @@ function renderAssetsGraphView() {
         // ステータスによる色分け（STATUS_DEFSの定義順が優先順）
         const statusArray = Array.isArray(asset.status) ? asset.status : [asset.status];
         const matchedStatus = STATUS_DEFS.find(def => def.nodeColor && statusArray.includes(def.value));
-        const nodeColor = matchedStatus ? matchedStatus.nodeColor : '#6366f1';
+        const nodeColor = matchedStatus ? matchedStatus.nodeColor : '#6c7787'; // 状態未設定はニュートラル
         
         node.style.borderColor = nodeColor;
         node.style.background = `linear-gradient(135deg, ${nodeColor}15 0%, ${nodeColor}05 100%)`;
@@ -1376,7 +1376,7 @@ function editAssetNameInGraph(assetId, nodeElement) {
         background: #fff;
         color: var(--text);
         outline: none;
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        box-shadow: 0 0 0 3px rgba(39, 83, 136, 0.2);
     `;
     
     const finishEdit = () => {

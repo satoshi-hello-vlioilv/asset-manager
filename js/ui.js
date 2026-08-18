@@ -38,6 +38,50 @@ function closeModal(id) {
     }
 }
 
+/* ============================================================
+   情報密度の切り替え
+   一覧で一度に見える件数を増やす「コンパクト」を既定とし、
+   じっくり読みたい場面のために「ゆったり」も選べるようにする。
+   ============================================================ */
+
+/**
+ * 保存されている密度設定を画面に反映する
+ */
+function applyDensity() {
+    const density = (uiPrefs && uiPrefs.density === 'cozy') ? 'cozy' : 'compact';
+    document.documentElement.setAttribute('data-density', density);
+
+    // メニューのチェック表示を同期
+    const compact = document.getElementById('menuDensityCompact');
+    const cozy = document.getElementById('menuDensityCozy');
+    if(compact) compact.classList.toggle('is-checked', density === 'compact');
+    if(cozy) cozy.classList.toggle('is-checked', density === 'cozy');
+    if(compact) compact.querySelector('i').style.visibility = density === 'compact' ? 'visible' : 'hidden';
+    if(cozy) cozy.querySelector('i').style.visibility = density === 'cozy' ? 'visible' : 'hidden';
+}
+
+/**
+ * 密度を変更して保存する
+ * @param {'compact'|'cozy'} density
+ */
+function setDensity(density) {
+    uiPrefs.density = density;
+    applyDensity();
+    closeMenus();
+    autoSaveData();
+    showToast(density === 'compact' ? '表示をコンパクトにしました' : '表示をゆったりにしました', 'info');
+}
+
+/**
+ * 日付入力に今日の日付を入れる（入力補助）
+ */
+function setDateFieldToday(inputId) {
+    const el = document.getElementById(inputId);
+    if(!el) return;
+    el.value = todayISO();
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
 /**
  * サイドバーの開閉（モバイル表示用）
  * @param {boolean} [force] - true:開く / false:閉じる / 省略:トグル
@@ -121,12 +165,20 @@ const KEY_SHORTCUTS = [
         ]
     },
     {
-        group: '一覧・グラフ',
+        group: '一覧',
         items: [
+            { keys: ['↑', '↓'], desc: '行を選択（Enter で開く）' },
             { keys: ['1'],   desc: 'リスト表示' },
             { keys: ['2'],   desc: 'カード表示' },
-            { keys: ['3'],   desc: 'カレンダー表示' },
-            { keys: ['Del'], desc: 'グラフで選択中のノード・接続を削除' }
+            { keys: ['3'],   desc: 'カレンダー表示' }
+        ]
+    },
+    {
+        group: '資産詳細',
+        items: [
+            { keys: ['Alt', '←'], desc: '一覧の前の資産へ' },
+            { keys: ['Alt', '→'], desc: '一覧の次の資産へ' },
+            { keys: ['Del'],      desc: 'グラフで選択中のノード・接続を削除' }
         ]
     }
 ];

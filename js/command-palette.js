@@ -72,16 +72,22 @@ function buildPaletteGroups(query) {
     const groups = [];
 
     if(!q) {
-        // 入力前：直前の文脈に沿った候補を出す
-        const recent = getPersistedAssets()
-            .sort((a, b) => new Date(b.date) - new Date(a.date))
-            .slice(0, 5)
-            .map(a => assetToPaletteItem(a, ''));
-        if(recent.length > 0) groups.push({ group: '最近の資産', items: recent });
+        // 入力前：直前の作業の続きに戻れる候補を先に出す
+        let recent = getRecentlyOpenedAssets(5);
+        if(recent.length === 0) {
+            // まだ開いた実績が無いうちは、新しく登録された順で代用する
+            recent = getPersistedAssets()
+                .slice()
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .slice(0, 5);
+        }
+        if(recent.length > 0) {
+            groups.push({ group: '最近開いた資産', items: recent.map(a => assetToPaletteItem(a, '')) });
+        }
 
         groups.push({
             group: 'よく使う操作',
-            items: getPaletteCommands().slice(0, 4).map(cmd => commandToPaletteItem(cmd))
+            items: sortCommandsByUsage(getPaletteCommands()).slice(0, 5).map(cmd => commandToPaletteItem(cmd))
         });
         return groups;
     }
@@ -92,9 +98,11 @@ function buildPaletteGroups(query) {
         if(a.id.toLowerCase().includes(q)) return true;
         if((a.specs || '').toLowerCase().includes(q)) return true;
         return tags.filter(t => a.tags.includes(t.id)).some(t => t.name.toLowerCase().includes(q));
-    }).slice(0, 8);
+    });
+    // 一致した中では「最近開いた / よく開く」ものを上に出す
+    assetMatches.sort((a, b) => usageScore('assets', b.id) - usageScore('assets', a.id));
     if(assetMatches.length > 0) {
-        groups.push({ group: '資産', items: assetMatches.map(a => assetToPaletteItem(a, q)) });
+        groups.push({ group: '資産', items: assetMatches.slice(0, 8).map(a => assetToPaletteItem(a, q)) });
     }
 
     // タグ（選ぶとその絞り込みに切り替わる）
@@ -118,7 +126,7 @@ function buildPaletteGroups(query) {
     }
 
     // 操作
-    const cmdMatches = getPaletteCommands().filter(c => c.title.toLowerCase().includes(q));
+    const cmdMatches = sortCommandsByUsage(getPaletteCommands().filter(c => c.title.toLowerCase().includes(q)));
     if(cmdMatches.length > 0) {
         groups.push({ group: '操作', items: cmdMatches.map(c => commandToPaletteItem(c, q)) });
     }
@@ -140,6 +148,7 @@ function assetToPaletteItem(asset, q) {
 
 function commandToPaletteItem(cmd, q = '') {
     return {
+        commandId: cmd.id,
         icon: cmd.icon,
         title: highlight(cmd.title, q),
         sub: '',
@@ -220,8 +229,17 @@ function updatePaletteActiveClass(scroll = false) {
 function runPaletteItem(index) {
     const item = paletteState.items[index];
     if(!item) return;
+    if(item.commandId) recordUsage('commands', item.commandId);
     closePalette();
     item.run();
+}
+
+/**
+ * 操作候補を「よく使う順」に並べ替える
+ * 定義順は開発者の都合でしかないので、実際に使われた回数で並べ直す。
+ */
+function sortCommandsByUsage(commands) {
+    return [...commands].sort((a, b) => usageScore('commands', b.id) - usageScore('commands', a.id));
 }
 
 /**
