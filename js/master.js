@@ -60,8 +60,8 @@ function injectCFStyles() {
             flex: 1;
             min-width: 0;
             overflow-y: auto;
-            padding: 24px 20px 32px;
-            background: var(--surface-sunken);
+            padding: 16px 20px 24px;
+            background: var(--canvas);
         }
         .cf-right-pane {
             width: 440px;
@@ -86,12 +86,9 @@ function injectCFStyles() {
             padding: 20px;
         }
         /* ── 選択中タグカードのハイライト ── */
-        .nested-card.cf-selected {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(39,83,136,0.12);
-        }
         .nested-card.cf-selected > .nested-card-header {
             background: var(--primary-bg);
+            box-shadow: inset 2px 0 0 var(--primary);
         }
         /* ── フィールドアイテム ── */
         .cf-field-item {
@@ -268,69 +265,75 @@ function addNewMasterDefinition() {
     }
 }
 
+/**
+ * 編集対象のマスタを上部タブで切り替える
+ * 選択中のタブにだけ名称変更・削除を出す（対象を取り違えない）
+ */
 function renderMasterCats() {
     const list = document.getElementById('masterCategoryList');
-    list.innerHTML = '';
-    masters.forEach(m => {
-        const btn = document.createElement('div');
-        btn.className = `cat-btn ${currentMasterId === m.id ? 'active' : ''}`;
-        btn.style.cssText = 'display:flex;align-items:center;gap:8px;padding:12px 16px;cursor:pointer;border-radius:8px;transition:all 0.2s;margin-bottom:4px;';
-        if(currentMasterId === m.id) {
-            btn.style.background = 'var(--primary)';
-            btn.style.color      = '#fff';
-            btn.style.boxShadow  = 'var(--shadow-sm)';
-        } else {
-            btn.style.background = 'var(--surface-sunken)';
-            btn.style.color      = 'var(--n-700)';
-        }
-        btn.onmouseover = () => { if(currentMasterId !== m.id) btn.style.background = 'var(--border)'; };
-        btn.onmouseout  = () => { if(currentMasterId !== m.id) btn.style.background = 'var(--surface-sunken)'; };
+    if(!list) return;
+    list.innerHTML = masters.map(m => {
+        const count = tags.filter(t => t.masterId === m.id).length;
+        const isActive = currentMasterId === m.id;
+        return `
+            <div class="master-tab ${isActive ? 'active' : ''}" role="tab" aria-selected="${isActive}">
+                <button class="master-tab-main" onclick="selectMasterCategory('${escapeAttr(m.id)}')" title="${escapeAttr(m.name)}">
+                    <span class="master-tab-name">${escapeHTML(m.name)}</span>
+                    <span class="count-pill" title="タグ数">${count}</span>
+                </button>
+                ${isActive ? `
+                    <button class="master-tab-action" onclick="editMasterName('${escapeAttr(m.id)}')" title="マスタ名を変更" aria-label="マスタ名を変更">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <button class="master-tab-action is-danger" onclick="deleteMaster('${escapeAttr(m.id)}')" title="マスタを削除" aria-label="マスタを削除">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>` : ''}
+            </div>`;
+    }).join('') + `
+        <button class="master-tab-add" onclick="addNewMasterDefinition()" title="マスタ定義（タグの分類軸）を追加">
+            <i class="fa-solid fa-plus"></i> マスタを追加
+        </button>`;
+}
 
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = m.name;
-        nameSpan.style.cssText = 'flex:1;font-weight:600;font-size:0.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;';
-        nameSpan.title = m.name;
-        nameSpan.onclick = () => { currentMasterId = m.id; renderMasterCats(); loadEditor(); };
+/* タグツリーの表示状態（描き直しても保つ） */
+let masterTreeQuery = '';
+let masterTreeHelpOpen = false;
+const masterTreeCollapsed = new Set();
 
-        if(currentMasterId === m.id) {
-            const actionsDiv = document.createElement('div');
-            actionsDiv.style.cssText = 'display:flex;gap:2px;flex-shrink:0;';
+function toggleMasterTreeNode(tagId) {
+    if(masterTreeCollapsed.has(tagId)) masterTreeCollapsed.delete(tagId);
+    else masterTreeCollapsed.add(tagId);
+    const card = document.getElementById(`tag-card-${tagId}`);
+    if(card) card.classList.toggle('is-collapsed', masterTreeCollapsed.has(tagId));
+}
 
-            const editBtn = document.createElement('button');
-            editBtn.className = 'btn btn-icon-only';
-            editBtn.style.cssText = 'padding:6px;width:28px;height:28px;border-radius:6px;transition:all 0.2s;background:rgba(255,255,255,0.2);color:#fff;';
-            editBtn.innerHTML = '<i class="fa-solid fa-pen" style="font-size:0.75rem;"></i>';
-            editBtn.title = 'マスタ名を編集';
-            editBtn.onmouseover = () => editBtn.style.background = 'rgba(255,255,255,0.3)';
-            editBtn.onmouseout  = () => editBtn.style.background = 'rgba(255,255,255,0.2)';
-            editBtn.onclick = (e) => { e.stopPropagation(); editMasterName(m.id); };
+function toggleTreeHelp() {
+    masterTreeHelpOpen = !masterTreeHelpOpen;
+    const help = document.getElementById('masterTreeHelp');
+    if(help) help.style.display = masterTreeHelpOpen ? 'grid' : 'none';
+    document.querySelector('.tree-help-toggle')?.setAttribute('aria-expanded', masterTreeHelpOpen);
+}
 
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'btn btn-icon-only';
-            deleteBtn.style.cssText = 'padding:6px;width:28px;height:28px;border-radius:6px;transition:all 0.2s;background:rgba(176,48,36,0.15);color:var(--r-200);';
-            deleteBtn.innerHTML = '<i class="fa-solid fa-trash" style="font-size:0.75rem;"></i>';
-            deleteBtn.title = 'マスタを削除';
-            deleteBtn.onmouseover = () => { deleteBtn.style.background='rgba(176,48,36,0.25)'; deleteBtn.style.color='#fff'; };
-            deleteBtn.onmouseout  = () => { deleteBtn.style.background='rgba(176,48,36,0.15)'; deleteBtn.style.color='var(--r-200)'; };
-            deleteBtn.onclick = (e) => { e.stopPropagation(); deleteMaster(m.id); };
+/** 一覧表示から最上位のタグを追加する */
+function addRootTagFromList() {
+    if(!currentMasterId) { showToast('先にマスタを追加してください', 'error'); return; }
+    const master = masters.find(m => m.id === currentMasterId);
+    const name = prompt(`「${master ? master.name : ''}」に追加するタグ名を入力:`);
+    if(!name || !name.trim()) return;
+    tags.push({ id: Date.now(), masterId: currentMasterId, name: name.trim(), parentIds: [], customFields: [] });
+    masterTreeQuery = '';
+    renderMasterCats();
+    loadEditor();
+    renderSidebar();
+    autoSaveData();
+    showToast(`「${name.trim()}」を追加しました`, 'success');
+}
 
-            actionsDiv.appendChild(editBtn);
-            actionsDiv.appendChild(deleteBtn);
-            btn.appendChild(nameSpan);
-            btn.appendChild(actionsDiv);
-        } else {
-            btn.appendChild(nameSpan);
-        }
-
-        const chevron = document.createElement('i');
-        chevron.className = 'fa-solid fa-chevron-right';
-        chevron.style.cssText = 'font-size:0.7rem;flex-shrink:0;transition:transform 0.2s;';
-        chevron.style.color = currentMasterId === m.id ? '#fff' : 'var(--text-faint)';
-        if(currentMasterId === m.id) chevron.style.transform = 'translateX(2px)';
-        btn.appendChild(chevron);
-
-        list.appendChild(btn);
-    });
+function selectMasterCategory(masterId) {
+    currentMasterId = masterId;
+    masterTreeQuery = '';
+    renderMasterCats();
+    loadEditor();
 }
 
 function switchView(view) {
@@ -359,6 +362,7 @@ function switchView(view) {
 
 function loadEditor() {
     selectedElement = null;
+    renderMasterCats(); // タブのタグ数を最新に
     if(currentView === 'list') renderListView();
     else renderGraphView();
 }
@@ -372,7 +376,7 @@ function renderListView() {
     const container = document.getElementById('listView');
     // max-width 制約を解除してモーダルの全幅を活用
     container.className   = '';
-    container.style.cssText = 'width:100%;height:100%;overflow:hidden;';
+    container.style.cssText = 'width:100%;flex:1;min-height:0;overflow:hidden;';
     container.innerHTML   = '';
     currentDetailTagId    = null;
     cfPaneMode            = 'list';
@@ -403,62 +407,67 @@ function _buildTagTreeInto(pane) {
     pane.innerHTML = '';
     const currentTags = tags.filter(t => t.masterId === currentMasterId);
 
-    // 操作ガイド（折り畳み）
-    const helpWrap   = document.createElement('div');
-    helpWrap.style.cssText = 'margin-bottom:16px;';
-    const helpToggle = document.createElement('div');
-    helpToggle.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:background 0.2s;font-size:0.88rem;color:var(--n-600);';
-    helpToggle.onmouseover = () => helpToggle.style.background = 'var(--surface-muted)';
-    helpToggle.onmouseout  = () => helpToggle.style.background = '#fff';
-    helpToggle.innerHTML = `
-        <i class="fa-solid fa-info-circle" style="color:var(--primary);font-size:0.9rem;"></i>
-        <span style="font-weight:600;">操作方法と階層構造のルール</span>
-        <i class="fa-solid fa-chevron-down" id="helpChevron"
-           style="margin-left:auto;color:var(--text-faint);transition:transform 0.2s;font-size:0.75rem;"></i>
-    `;
-    const helpContent = document.createElement('div');
-    helpContent.style.cssText = 'display:none;margin-top:8px;padding:16px;background:#fff;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;';
-    helpContent.innerHTML = `
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
-            <div>
-                <div style="font-weight:700;margin-bottom:8px;color:var(--n-600);display:flex;align-items:center;gap:6px;">
-                    <i class="fa-solid fa-pencil" style="color:var(--n-600);"></i>基本操作
-                </div>
-                <ul style="margin:0;padding-left:16px;color:var(--text-sub);line-height:1.9;">
-                    <li><strong>タグ名編集:</strong> タグ名をクリック</li>
-                    <li><strong>階層移動:</strong> ドラッグ&amp;ドロップ</li>
-                    <li><strong>子要素追加:</strong> 「+」ボタン</li>
-                    <li><strong>固有項目管理:</strong> <i class="fa-solid fa-sliders" style="color:var(--primary);"></i> ボタン → 右ペインで設定</li>
-                </ul>
-            </div>
-            <div>
-                <div style="font-weight:700;margin-bottom:8px;color:var(--n-600);display:flex;align-items:center;gap:6px;">
-                    <i class="fa-solid fa-sitemap" style="color:var(--primary);"></i>階層のルール
-                </div>
-                <ul style="margin:0;padding-left:16px;color:var(--text-sub);line-height:1.9;">
-                    <li>同じ階層レベルなら複数の親を持てる</li>
-                    <li>階層を飛ばす接続は自動調整</li>
-                    <li>循環参照は作成不可</li>
-                </ul>
-            </div>
-            <div>
-                <div style="font-weight:700;margin-bottom:8px;color:var(--n-600);display:flex;align-items:center;gap:6px;">
-                    <i class="fa-solid fa-sliders" style="color:var(--primary);"></i>固有の入力項目とは
-                </div>
-                <div style="color:var(--text-sub);line-height:1.7;">
-                    <i class="fa-solid fa-sliders" style="color:var(--primary);"></i> ボタンで右ペインを開くと、そのタグが選択された資産にだけ表示される専用の入力欄を設定できます。
-                </div>
-            </div>
+    // ツールバー：検索・ルート追加・操作方法（説明は必要なときだけ開く）
+    const toolbar = document.createElement('div');
+    toolbar.className = 'tree-toolbar';
+    toolbar.innerHTML = `
+        <div class="tree-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" class="input" id="masterTreeSearch" placeholder="タグを検索…" autocomplete="off"
+                   value="${escapeAttr(masterTreeQuery)}">
         </div>
+        <button class="btn btn-primary btn-sm" onclick="addRootTagFromList()">
+            <i class="fa-solid fa-plus"></i> ルートにタグを追加
+        </button>
+        <button class="btn btn-ghost btn-sm tree-help-toggle" onclick="toggleTreeHelp()" aria-expanded="${masterTreeHelpOpen}">
+            <i class="fa-solid fa-circle-question"></i> 操作方法
+        </button>
     `;
-    helpToggle.onclick = () => {
-        const isOpen = helpContent.style.display !== 'none';
-        helpContent.style.display = isOpen ? 'none' : 'block';
-        helpToggle.querySelector('#helpChevron').style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+    pane.appendChild(toolbar);
+
+    // 入力のたびにツリーだけを描き直す（入力欄のフォーカスと位置は保つ）
+    const searchInput = toolbar.querySelector('#masterTreeSearch');
+    searchInput.oninput = () => {
+        masterTreeQuery = searchInput.value;
+        const pos = searchInput.selectionStart;
+        _buildTagTreeInto(pane);
+        const next = document.getElementById('masterTreeSearch');
+        if(next) { next.focus(); next.setSelectionRange(pos, pos); }
     };
-    helpWrap.appendChild(helpToggle);
-    helpWrap.appendChild(helpContent);
-    pane.appendChild(helpWrap);
+
+    const help = document.createElement('div');
+    help.className = 'tree-help';
+    help.id = 'masterTreeHelp';
+    help.style.display = masterTreeHelpOpen ? 'grid' : 'none';
+    help.innerHTML = `
+        <div>
+            <div class="tree-help-title"><i class="fa-solid fa-pencil"></i> 基本操作</div>
+            <ul>
+                <li><strong>名前の変更:</strong> タグ名をクリック</li>
+                <li><strong>階層の移動:</strong> 行をドラッグして別のタグに重ねる</li>
+                <li><strong>子タグの追加:</strong> 行の <i class="fa-solid fa-plus"></i></li>
+                <li><strong>固有の入力項目:</strong> 行の <i class="fa-solid fa-sliders"></i> → 右ペインで設定</li>
+            </ul>
+        </div>
+        <div>
+            <div class="tree-help-title"><i class="fa-solid fa-sitemap"></i> 階層のルール</div>
+            <ul>
+                <li>同じ階層レベルなら複数の親を持てる</li>
+                <li>階層を飛ばす接続は自動調整</li>
+                <li>循環参照は作成不可</li>
+            </ul>
+        </div>
+        <div>
+            <div class="tree-help-title"><i class="fa-solid fa-hashtag"></i> 行の数字</div>
+            <ul>
+                <li><span class="count-pill">12</span> そのタグ（配下を含む）が付いた資産の数</li>
+                <li><span class="tree-cf-badge"><i class="fa-solid fa-sliders"></i> 2</span> 固有の入力項目の数</li>
+            </ul>
+        </div>`;
+    pane.appendChild(help);
+
+    const assetCounts = countAssetsByTag(getPersistedAssets());
+    const needle = masterTreeQuery.trim().toLowerCase();
 
     // 複数親識別
     const multiParentNodes = new Set();
@@ -502,31 +511,38 @@ function _buildTagTreeInto(pane) {
 
         const uniqueId  = parentId !== null ? `tag-name-${tag.id}-p${parentId}` : `tag-name-${tag.id}`;
         const multiIcon = multiParentNodes.has(tag.id)
-            ? `<i class="fa-solid fa-link" style="color:var(--primary);font-size:0.75rem;margin-right:4px;" title="複数の親に所属"></i>` : '';
+            ? `<i class="fa-solid fa-link tree-multi" title="複数の親に所属"></i>` : '';
         const cfCount = (tag.customFields || []).length;
+        const hasChildren = getChildrenOf(tag.id).length > 0;
+        const isCollapsed = !needle && masterTreeCollapsed.has(tag.id);
+        if(isCollapsed) wrapper.classList.add('is-collapsed');
+        if(needle && tag.name.toLowerCase().includes(needle)) wrapper.classList.add('is-match');
 
         header.innerHTML = `
-            <i class="fa-solid fa-grip-vertical" style="color:var(--border-strong);"></i>
+            <i class="fa-solid fa-grip-vertical tree-grip" title="ドラッグして階層を移動"></i>
+            ${hasChildren
+                ? `<button class="tree-toggle" onclick="toggleMasterTreeNode(${tag.id})" title="${isCollapsed ? '開く' : '閉じる'}" aria-label="${isCollapsed ? '開く' : '閉じる'}">
+                       <i class="fa-solid fa-chevron-down"></i></button>`
+                : '<span class="tree-toggle-spacer"></span>'}
             ${multiIcon}
-            <span id="${uniqueId}" data-tag-id="${tag.id}"
-                  style="font-weight:600;cursor:pointer;padding:4px 8px;border-radius:4px;transition:background 0.15s;flex:1;min-width:0;"
+            <span id="${uniqueId}" data-tag-id="${tag.id}" class="tree-name"
                   onclick="startEditTagNameInList(${tag.id},'${uniqueId}')"
-                  onmouseover="this.style.background='rgba(0,0,0,0.05)'"
-                  onmouseout="this.style.background='transparent'"
-                  title="クリックして名前を編集">${tag.name}</span>
+                  title="クリックして名前を編集">${escapeHTML(tag.name)}</span>
+            ${cfCount > 0 ? `<button class="tree-cf-badge" onclick="openCFRightPane(${tag.id})" title="固有の入力項目 ${cfCount}件">
+                <i class="fa-solid fa-sliders"></i> ${cfCount}項目</button>` : ''}
+            <span class="count-pill tree-count" title="このタグ（配下を含む）が付いた資産の数">${assetCounts.get(tag.id) || 0}</span>
             <div class="card-actions">
-                <button class="btn btn-icon-only btn-ghost cf-mgr-btn"
+                <button class="btn btn-icon-only btn-ghost btn-sm cf-mgr-btn"
                         id="cf-btn-${tag.id}"
                         onclick="openCFRightPane(${tag.id})"
                         title="固有の入力項目を右ペインで管理">
                     <i class="fa-solid fa-sliders"></i>
-                    ${cfCount > 0 ? `<span class="cf-badge">${cfCount}</span>` : ''}
                 </button>
-                <button class="btn btn-icon-only btn-ghost"
-                        onclick="addNewChild(${tag.id})" title="子要素を追加">
+                <button class="btn btn-icon-only btn-ghost btn-sm"
+                        onclick="addNewChild(${tag.id})" title="子タグを追加">
                     <i class="fa-solid fa-plus"></i>
                 </button>
-                <button class="btn btn-icon-only btn-ghost" style="color:var(--danger);"
+                <button class="btn btn-icon-only btn-ghost btn-sm tree-delete"
                         onclick="deleteTag(${tag.id})" title="削除">
                     <i class="fa-solid fa-trash"></i>
                 </button>
@@ -544,11 +560,39 @@ function _buildTagTreeInto(pane) {
         return wrapper;
     };
 
-    roots.forEach(r => pane.appendChild(createCard(r)));
+    // 検索中は、名前が一致するタグとその祖先・子孫だけを残す
+    const subtreeMatches = (tag, guard = 0) => guard < 10 && (tag.name.toLowerCase().includes(needle)
+        || getChildrenOf(tag.id).some(c => subtreeMatches(c, guard + 1)));
+
+    const tree = document.createElement('div');
+    tree.className = 'tag-tree';
+    roots.forEach(r => tree.appendChild(createCard(r)));
+    if(needle) {
+        tree.querySelectorAll('.nested-card').forEach(card => {
+            const id = Number(card.id.replace('tag-card-', ''));
+            const t = currentTags.find(x => x.id === id);
+            const ancestorMatch = (() => {
+                let p = card.parentElement.closest('.nested-card');
+                while(p) { if(p.classList.contains('is-match')) return true; p = p.parentElement.closest('.nested-card'); }
+                return false;
+            })();
+            if(t && !subtreeMatches(t) && !ancestorMatch) card.style.display = 'none';
+        });
+    }
+    pane.appendChild(tree);
+
+    if(roots.length === 0) {
+        tree.innerHTML = `
+            <div class="empty-state">
+                <i class="fa-solid fa-tags empty-state-icon"></i>
+                <div class="empty-state-title">このマスタにはまだタグがありません</div>
+                <div class="empty-state-desc">「ルートにタグを追加」から最初のタグを作成してください</div>
+            </div>`;
+    }
 
     const dropZone = document.createElement('div');
-    dropZone.style.cssText = 'padding:20px;border:2px dashed var(--border-strong);border-radius:8px;text-align:center;color:var(--text-faint);margin-top:20px;background:var(--surface-sunken);font-size:0.88rem;';
-    dropZone.innerText = 'ここにドロップしてルート（親なし）にする';
+    dropZone.className = 'tree-root-drop';
+    dropZone.innerHTML = '<i class="fa-solid fa-arrow-turn-up"></i> ここにドロップすると最上位（親なし）に移動';
     dropZone.ondragover = (e) => e.preventDefault();
     dropZone.ondrop     = (e) => { e.preventDefault(); makeRoot(parseInt(e.dataTransfer.getData('text/id'))); };
     pane.appendChild(dropZone);
@@ -1163,7 +1207,7 @@ function switchMasterTab(mode) {
 }
 
 function saveMasterChanges() {
-    // タグ階層やカスタムフィールドの変更は、一覧の列定義・サイドバー・
+    // タグ階層やカスタムフィールドの変更は、一覧の列定義・フィルタバー・
     // 表示中の一覧すべてに波及するため、まとめて作り直す
     addCustomFieldColumns();
     renderSidebar();
@@ -1220,6 +1264,7 @@ function renderAssetsListView() {
     wrap.appendChild(helpSection);
 
     const mainArea = document.createElement('div');
+    mainArea.className = 'tag-tree';
     mainArea.style.cssText = 'flex:1;overflow-y:auto;width:100%;';
     const rootAssets = assets.filter(a => !a.parentId);
 

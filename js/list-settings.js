@@ -401,21 +401,7 @@ function saveListSettings() {
 function resetListSettings() {
     if(!confirm('リスト表示設定をデフォルトに戻しますか？')) return;
 
-    const tagColumns = masters.map((m, idx) => ({
-        key: `tags-${m.id}`,
-        label: m.name,
-        visible: true,
-        order: 3 + idx,
-        align: 'left',
-        width: 'auto'
-    }));
-
-    listDisplaySettings.columns = [
-        { key: 'name', label: '資産名称', visible: true, order: 0, align: 'left', width: 'auto' },
-        { key: 'date', label: '導入日', visible: true, order: 1, align: 'left', width: 'auto' },
-        ...tagColumns,
-        { key: 'status', label: 'ステータス', visible: true, order: 3 + tagColumns.length, align: 'right', width: 'auto' }
-    ];
+    listDisplaySettings.columns = getDefaultListColumns();
 
     renderListColumnsSettings();
     showToast('デフォルト設定に戻しました', 'success');

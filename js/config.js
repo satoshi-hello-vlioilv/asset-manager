@@ -5,8 +5,8 @@
  */
 
 // アプリケーションバージョン（セマンティックバージョニング）
-// サイドバーのアプリ名横に表示される。更新時はここを変更するだけでよい。
-const APP_VERSION = '2.2.0';
+// 「その他の操作（⋮）」メニュー下部とロゴのツールチップに表示される。更新時はここを変更するだけでよい。
+const APP_VERSION = '3.0.0';
 
 // データ形式のバージョン（DBとバックアップZIPの互換性判定に使う）
 // 3.0 から画像を images ストアに分離し、バックアップはZIP形式になった。
@@ -293,17 +293,47 @@ let uiPrefs = {
 };
 
 // リスト表示設定
-let listDisplaySettings = {
-    columns: [
+// 既定の列: 名称（状態ドット付き）→ 次回予定 → マスタごとのタグ → ステータス
+// 「次に何をすべきか」が分かる次回予定を名称のすぐ隣に置く。導入日は列設定から出せる。
+function getDefaultListColumns() {
+    const tagColumns = masters.map((m, idx) => ({
+        key: `tags-${m.id}`, label: m.name, visible: true, order: 2 + idx, align: 'left', width: 'auto'
+    }));
+    return [
         { key: 'name', label: '資産名称', visible: true, order: 0, align: 'left', width: 'auto' },
-        { key: 'id', label: '資産ID', visible: false, order: 1, align: 'left', width: 'auto' },
-        { key: 'date', label: '導入日', visible: true, order: 2, align: 'left', width: 'auto' },
-        { key: 'tags-loc', label: '設置場所・組織', visible: true, order: 3, align: 'left', width: 'auto' },
-        { key: 'tags-cat', label: '資産分類・属性', visible: true, order: 4, align: 'left', width: 'auto' },
-        { key: 'tags-spec', label: '仕様', visible: true, order: 5, align: 'left', width: 'auto' },
-        { key: 'status', label: 'ステータス', visible: true, order: 6, align: 'right', width: 'auto' }
-    ]
+        { key: 'scheduledPlans.next', label: '次回予定', visible: true, order: 1, align: 'left', width: 'auto' },
+        ...tagColumns,
+        { key: 'status', label: 'ステータス', visible: true, order: 2 + tagColumns.length, align: 'left', width: 'auto' },
+        { key: 'date', label: '導入日', visible: false, order: 3 + tagColumns.length, align: 'left', width: 'auto' },
+        { key: 'id', label: '資産ID', visible: false, order: 4 + tagColumns.length, align: 'left', width: 'auto' }
+    ];
+}
+
+// 列の既定構成の版。上げると、保存済みの列設定に新しい既定列を1度だけ追加する。
+const LIST_LAYOUT_VERSION = 3;
+
+let listDisplaySettings = {
+    columns: getDefaultListColumns()
 };
+
+/**
+ * 保存済みの列設定を新しい既定に合わせる（ユーザーの並べ替え・表示切替は尊重する）
+ * v3: 「次回予定」列を名称の次に追加
+ */
+function migrateListDisplaySettings() {
+    if((uiPrefs.listLayoutVersion || 0) >= LIST_LAYOUT_VERSION) return;
+    const cols = listDisplaySettings.columns || [];
+    if(!cols.some(c => c.key === 'scheduledPlans.next')) {
+        const nameCol = cols.find(c => c.key === 'name');
+        const at = nameCol ? nameCol.order + 1 : 0;
+        cols.forEach(c => { if(c.order >= at) c.order++; });
+        cols.push({ key: 'scheduledPlans.next', label: '次回予定', visible: true, order: at, align: 'left', width: 'auto' });
+    }
+    // ステータス列は見出しと揃えて左寄せにする（右寄せだと見出しと離れて読み取りにくい）
+    cols.forEach(c => { if(c.key === 'status') c.align = 'left'; });
+    listDisplaySettings.columns = cols;
+    uiPrefs.listLayoutVersion = LIST_LAYOUT_VERSION;
+}
 
 // グラフ状態管理（タグ用）
 let graphState = {
@@ -427,6 +457,7 @@ async function loadDataFromDB() {
         masters = loadedMasters;
 
         if (settingsEntry) listDisplaySettings = settingsEntry.value;
+        migrateListDisplaySettings();
         if (tagIdEntry) nextTagId = tagIdEntry.value;
         if (assetIdEntry) nextAssetId = assetIdEntry.value;
 

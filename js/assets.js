@@ -82,9 +82,10 @@ function renderAssetsList(list) {
 
     const columnWidths = calculateColumnWidths(visibleColumns, list);
 
+    // 一覧は内側でスクロールさせず、画面全体のスクロールに任せる
+    // （見出し行は sticky で上端に残る）。件数が多くても下が空白にならない。
     const listWrapper = document.createElement('div');
     listWrapper.className = 'list-table-wrap';
-    listWrapper.style.maxHeight = 'calc(100vh - 230px)';
 
     const table = document.createElement('table');
     table.className = 'list-table';
@@ -130,6 +131,9 @@ function renderAssetsList(list) {
             td.style.textAlign = col.align || 'left';
 
             td.innerHTML = getAssetFieldValue(asset, col.key);
+            td.dataset.col = col.key;
+            // 狭い画面のカード行では、空の項目を出さない
+            if(col.key !== 'name' && !getAssetFieldValue(asset, col.key, true)) td.classList.add('is-empty');
 
             // 最終列にだけホバー時のクイック操作を重ねる（開かずに1手で終わらせる導線）
             if(i === visibleColumns.length - 1) {
@@ -285,7 +289,11 @@ function getAssetFieldValue(asset, key, textOnly = false) {
     switch(key) {
         case 'name':
             if(textOnly) return asset.name;
-            return `<span class="cell-name">${escapeHTML(asset.name)}</span>`;
+            // 行頭の色ドットで状態を示す（ステータス列まで視線を動かさずに異常に気づける）
+            return `<span class="cell-name-wrap">
+                <span class="status-dot" style="background:${getAssetStatusColor(asset)};" title="${escapeHTML(statusArray.filter(Boolean).join('・') || '未設定')}"></span>
+                <span class="cell-name">${escapeHTML(asset.name)}</span>
+            </span>`;
 
         case 'id':
             if(textOnly) return asset.id.toUpperCase();
@@ -363,9 +371,10 @@ function getAssetFieldValue(asset, key, textOnly = false) {
             const next = getNextSchedule(asset);
             if(textOnly) return next ? next.date : '';
             if(!next) return '<span class="cell-sub">—</span>';
-            const days = daysUntil(next.date);
-            const tone = days < 0 ? 'var(--danger)' : days <= 7 ? 'var(--warning)' : 'var(--text-sub)';
-            return `<span style="color:${tone};" title="${escapeHTML(next.event || '')}">${escapeHTML(next.date)}<span style="opacity:0.75; margin-left:6px;">${formatDayDelta(days)}</span></span>`;
+            // 期限の近さを色で、内容を淡い文字で（日付そのものはツールチップ）
+            return `<span class="cell-due" title="${escapeHTML(next.date)} ${escapeHTML(next.event || '')}">
+                ${renderDuePill(daysUntil(next.date))}<span class="cell-sub">${escapeHTML(next.event || '')}</span>
+            </span>`;
         }
 
         case 'scheduledPlans.nextEvent': {
@@ -464,12 +473,11 @@ function renderAssetsCard(list) {
  * 「なぜ0件なのか」と「次に何をすればよいか」を必ず示す。
  */
 function renderAssetsEmptyState(container) {
-    const isFiltered = !!activeFilter || (searchQuery || '').trim() !== '';
+    const isFiltered = hasActiveFilters() || (searchQuery || '').trim() !== '';
 
     if(isFiltered) {
-        const desc = describeActiveFilter();
         const reason = [
-            desc ? `${desc.kind}「${desc.label}」` : null,
+            ...describeActiveFilters().map(d => `${d.kind}「${d.label}」`),
             (searchQuery || '').trim() ? `検索語「${searchQuery.trim()}」` : null
         ].filter(Boolean).join(' と ');
 

@@ -46,6 +46,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // バージョン表示（config.js の APP_VERSION を単一の情報源として反映）
     const versionBadge = document.getElementById('appVersionBadge');
     if(versionBadge) versionBadge.textContent = `v${APP_VERSION}`;
+    const logo = document.getElementById('appLogo');
+    if(logo) logo.title = `AssetManager v${APP_VERSION}`;
 
     // DBからデータを読み込み (非同期待機)
     await loadDataFromDB();
@@ -161,11 +163,10 @@ function setupGlobalEvents() {
             if(isLightboxOpen()) { closeLightbox(); return; }
             if(isPaletteOpen())  { closePalette();  return; }
             if(document.querySelector('.menu.open')) { closeMenus(); return; }
+            if(isFilterPopoverOpen()) { closeFilterPopover(); return; }
 
             const topModal = getTopModalId();
             if(topModal) { closeModal(topModal); return; }
-
-            if(document.body.classList.contains('sidebar-open')) toggleSidebar(false);
             return;
         }
 
@@ -245,22 +246,14 @@ function setupGlobalEvents() {
         }
     });
 
-    /* --- メニューは外側クリックで閉じる --- */
+    /* --- メニュー・絞り込みポップオーバーは外側クリックで閉じる --- */
     document.addEventListener('click', (e) => {
         if(!e.target.closest('.menu-wrap')) closeMenus();
+        if(isFilterPopoverOpen() && !e.target.closest('#filterPopover, .filter-btn')) closeFilterPopover();
     });
-
-    /* --- モバイル表示時：サイドバー内の項目を選択したら自動で閉じる --- */
-    const sidebarNav = document.getElementById('sidebarNav');
-    if(sidebarNav) {
-        sidebarNav.addEventListener('click', (e) => {
-            if(window.innerWidth > 900) return;
-            if(e.target.classList.contains('chevron')) return; // 折り畳み操作は除外
-            if(e.target.closest('.nav-item, .accordion-header-content, .nav-label, .tree-link')) {
-                toggleSidebar(false);
-            }
-        });
-    }
+    // 位置がずれたポップオーバーは残さない
+    window.addEventListener('resize', closeFilterPopover);
+    document.querySelector('.content-scroll').addEventListener('scroll', closeFilterPopover, { passive: true });
 
     /* --- グラフのホイールズーム --- */
     const graphView = document.getElementById('graphView');

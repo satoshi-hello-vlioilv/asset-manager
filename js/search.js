@@ -4,21 +4,41 @@
  * 絞り込み状態の一元管理と検索
  *
  * 設計:
- *   「今どの条件で絞り込まれているか」を単一の状態（activeFilter + searchQuery）で保持し、
+ *   「今どの条件で絞り込まれているか」を単一の状態（filterState + searchQuery）で保持し、
  *   表示は常にその状態から再計算する（単方向データフロー）。
- *   これにより「検索欄を消しても一覧が戻らない」「フィルタ中に追加した資産が出てこない」
- *   といった、状態が分散していたことによる不整合が構造的に発生しなくなる。
  *
- *   さらに、適用中の条件は必ずコンテキストバーにチップとして表示する。
+ *   条件は「稼働状況」と「マスタごとのタグ」を同時に組み合わせられる
+ *   （例: 停止中 × 第1工場 × フォークリフト）。マスタが増えても同じ仕組みで扱える。
+ *
+ *   適用中の条件は必ず一覧上部のフィルタバーに表示する。
  *   ユーザーが「何で絞り込んでいたか」を記憶しておく必要をなくすため。
  */
 
-/* 適用中の絞り込み条件（1つだけ保持する。複合条件は検索語で行う）
-   { type:'tag', id } | { type:'master', id } | { type:'status', value } | null */
-let activeFilter = null;
+/* 適用中の絞り込み条件
+   status: ステータス名 / '__none__'（未設定）/ null
+   tags:   { [masterId]: tagId } マスタごとに1つ（配下のタグを含めて絞り込む） */
+let filterState = { status: null, tags: {} };
 
 /* 検索語（絞り込み条件の中をさらに絞る） */
 let searchQuery = '';
+
+/** 絞り込み条件（検索語以外）が1つでもあるか */
+function hasActiveFilters() {
+    return !!filterState.status || Object.keys(filterState.tags).length > 0;
+}
+
+/** 絞り込みと検索語をまとめて初期化する（画面遷移・データ取り込み時） */
+function resetFilterState() {
+    filterState = { status: null, tags: {} };
+    resetSearchQuery();
+}
+
+/** 絞り込みに使っているタグID（マスタの並び順） */
+function getFilterTagIds() {
+    return masters
+        .map(m => filterState.tags[m.id])
+        .filter(id => id !== undefined && tags.some(t => t.id === id));
+}
 
 /**
  * 検索語だけをリセットする（絞り込み条件は保持）
@@ -31,46 +51,52 @@ function resetSearchQuery() {
 }
 
 /**
- * 絞り込み条件だけを適用した資産リスト（検索語は適用しない）
+ * 稼働状況が条件に合うか
  */
-function getScopedAssets() {
-    // 編集中の下書きは確定データではないので一覧には出さない
-    const pool = getPersistedAssets();
-    if(!activeFilter) return pool;
+function matchesStatus(asset, status) {
+    if(!status) return true;
+    if(status === '__none__') return !asset.status || asset.status.length === 0;
+    return Array.isArray(asset.status) && asset.status.includes(status);
+}
 
-    if(activeFilter.type === 'tag') {
-        const descendantIds = getAllDescendantIds(activeFilter.id);
-        return pool.filter(a => a.tags.some(t => descendantIds.includes(t)));
+/**
+ * 絞り込み条件だけを適用した資産リスト（検索語は適用しない）
+ * @param {{ignoreStatus?: boolean, ignoreMaster?: string}} [options]
+ *   件数表示用に、特定の条件だけ外して数えたいときに使う
+ */
+function getScopedAssets(options = {}) {
+    // 編集中の下書きは確定データではないので一覧には出さない
+    let list = getPersistedAssets();
+
+    if(!options.ignoreStatus) {
+        list = list.filter(a => matchesStatus(a, filterState.status));
     }
-    if(activeFilter.type === 'master') {
-        const masterTagIds = tags.filter(t => t.masterId === activeFilter.id).map(t => t.id);
-        return pool.filter(a => a.tags.some(t => masterTagIds.includes(t)));
-    }
-    if(activeFilter.type === 'status') {
-        if(activeFilter.value === '__none__') {
-            return pool.filter(a => !a.status || a.status.length === 0);
-        }
-        return pool.filter(a => Array.isArray(a.status) && a.status.includes(activeFilter.value));
-    }
-    return pool;
+
+    Object.entries(filterState.tags).forEach(([masterId, tagId]) => {
+        if(masterId === options.ignoreMaster) return;
+        const descendantIds = getAllDescendantIds(tagId);
+        list = list.filter(a => a.tags.some(t => descendantIds.includes(t)));
+    });
+
+    return list;
 }
 
 /**
  * 絞り込み + 検索語を適用した最終的な表示リスト
  */
-function getFilteredAssets() {
-    const scoped = getScopedAssets();
+function getFilteredAssets(options = {}) {
+    const scoped = getScopedAssets(options);
     const needle = searchQuery.trim().toLowerCase();
     if(!needle) return scoped;
+    return scoped.filter(a => assetMatchesQuery(a, needle));
+}
 
-    return scoped.filter(a => {
-        if(a.name.toLowerCase().includes(needle)) return true;
-        if(a.id.toLowerCase().includes(needle)) return true;
-        if((a.specs || '').toLowerCase().includes(needle)) return true;
-        const myTags = tags.filter(t => a.tags.includes(t.id));
-        if(myTags.some(t => t.name.toLowerCase().includes(needle))) return true;
-        return false;
-    });
+/** 検索語に一致するか（名称・ID・備考・タグ名） */
+function assetMatchesQuery(a, needle) {
+    if(a.name.toLowerCase().includes(needle)) return true;
+    if(a.id.toLowerCase().includes(needle)) return true;
+    if((a.specs || '').toLowerCase().includes(needle)) return true;
+    return tags.some(t => a.tags.includes(t.id) && t.name.toLowerCase().includes(needle));
 }
 
 /**
@@ -79,8 +105,8 @@ function getFilteredAssets() {
 function applyFilters() {
     const list = getFilteredAssets();
     renderAssets(list);
-    renderContextBar(list.length);
-    updateSidebarFilterState();
+    renderFilterBar(list.length);
+    renderTopNav();
 }
 
 /**
@@ -90,84 +116,31 @@ function applyFilters() {
 function refreshCurrentView() {
     if(currentPage === 'dashboard') {
         renderDashboard();
+        renderTopNav();
     } else {
         applyFilters();
     }
 }
 
 /* ============================================================
-   コンテキストバー：適用中の条件と件数の常時表示
+   条件の説明（空状態・新規登録時の文言に使う）
    ============================================================ */
 
 /**
  * 現在の絞り込み条件を人が読める形にする
- * @returns {{kind:string, label:string}|null}
+ * @returns {{kind:string, label:string}[]}
  */
-function describeActiveFilter() {
-    if(!activeFilter) return null;
-
-    if(activeFilter.type === 'tag') {
-        const tag = tags.find(t => t.id === activeFilter.id);
-        if(!tag) return null;
+function describeActiveFilters() {
+    const out = [];
+    if(filterState.status) {
+        out.push({ kind: '稼働状況', label: filterState.status === '__none__' ? '未設定' : filterState.status });
+    }
+    getFilterTagIds().forEach(id => {
+        const tag = tags.find(t => t.id === id);
         const master = masters.find(m => m.id === tag.masterId);
-        return { kind: master ? master.name : 'タグ', label: tag.name };
-    }
-    if(activeFilter.type === 'master') {
-        const master = masters.find(m => m.id === activeFilter.id);
-        if(!master) return null;
-        return { kind: 'マスタ', label: `${master.name} が設定済み` };
-    }
-    if(activeFilter.type === 'status') {
-        return { kind: '稼働状況', label: activeFilter.value === '__none__' ? '未設定' : activeFilter.value };
-    }
-    return null;
-}
-
-function renderContextBar(visibleCount) {
-    const bar    = document.getElementById('contextBar');
-    const countEl= document.getElementById('contextCount');
-    const chipsEl= document.getElementById('contextChips');
-    const clearEl= document.getElementById('contextClear');
-    if(!bar) return;
-
-    if(currentPage !== 'assets') {
-        bar.classList.remove('show');
-        return;
-    }
-    bar.classList.add('show');
-
-    const total = getPersistedAssets().length;
-    const desc  = describeActiveFilter();
-    const hasQuery = searchQuery.trim() !== '';
-    const isFiltered = !!desc || hasQuery;
-
-    countEl.innerHTML = isFiltered
-        ? `<strong>${visibleCount}</strong> 件を表示中 <span style="opacity:0.6;">/ 全${total}件</span>`
-        : `<strong>${total}</strong> 件の資産`;
-
-    const chips = [];
-    if(desc) {
-        chips.push(`
-            <span class="chip">
-                <span class="chip-kind">${escapeHTML(desc.kind)}</span>
-                <span class="chip-label">${escapeHTML(desc.label)}</span>
-                <button class="chip-remove" onclick="clearAssetFilter()" title="この条件を解除" aria-label="絞り込みを解除">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </span>`);
-    }
-    if(hasQuery) {
-        chips.push(`
-            <span class="chip">
-                <span class="chip-kind">検索</span>
-                <span class="chip-label">${escapeHTML(searchQuery.trim())}</span>
-                <button class="chip-remove" onclick="clearSearchInput()" title="検索を解除" aria-label="検索を解除">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </span>`);
-    }
-    chipsEl.innerHTML = chips.join('');
-    clearEl.style.display = chips.length > 1 ? 'inline-flex' : 'none';
+        out.push({ kind: master ? master.name : 'タグ', label: tag.name });
+    });
+    return out;
 }
 
 /* ============================================================
@@ -197,111 +170,64 @@ function updateSearchInputState() {
    絞り込みの設定・解除
    ============================================================ */
 
+/** 一覧を開いていなければ開き、開いていれば描き直す */
+function showFilteredAssets() {
+    if(currentPage !== 'assets') showAssets({ keepFilter: true });
+    else applyFilters();
+}
+
 /**
  * タグで絞り込む（子孫タグも含む）
- * @param {number|null} tagId - null なら解除
+ * 同じマスタの条件は置き換え、別のマスタの条件とは組み合わせる。
+ * @param {number|null} tagId - null なら全条件を解除
  */
-function filterGrid(tagId, el) {
+function filterGrid(tagId) {
     if(tagId === null) { clearAssetFilter(); return; }
+    const tag = tags.find(t => t.id === tagId);
+    if(!tag) return;
 
     // 同じ条件をもう一度押したらトグルで解除（元に戻せる安心感）
-    if(activeFilter && activeFilter.type === 'tag' && activeFilter.id === tagId) {
-        clearAssetFilter();
-        return;
+    if(filterState.tags[tag.masterId] === tagId) {
+        delete filterState.tags[tag.masterId];
+    } else {
+        filterState.tags[tag.masterId] = tagId;
+        recordUsage('tags', tagId); // よく使う絞り込みの学習
     }
+    closeFilterPopover();
+    showFilteredAssets();
+}
 
-    activeFilter = { type: 'tag', id: tagId };
-    recordUsage('tags', tagId); // よく使う絞り込みの学習
-    resetSearchQuery();
-
-    if(currentPage !== 'assets') showAssets({ keepFilter: true });
-    else applyFilters();
+/** マスタ1つ分の条件を外す */
+function clearMasterFilter(masterId) {
+    delete filterState.tags[masterId];
+    closeFilterPopover();
+    showFilteredAssets();
 }
 
 /**
- * マスタ定義で絞り込む（そのマスタのタグが1つでも付いている資産）
+ * 稼働状況で絞り込む
+ * @param {string} value - ステータス名 / '__none__'（未設定）/ '__all__'（解除）
+ * @param {{keepTags?: boolean}} [options] - ダッシュボードから来たときはタグ条件を外す
  */
-function filterByMaster(masterId, labelEl) {
-    if(activeFilter && activeFilter.type === 'master' && activeFilter.id === masterId) {
-        clearAssetFilter();
-        return;
+function filterByStatus(value, options = {}) {
+    // フィルタバー上では同じ状態をもう一度押すと解除（トグル）
+    const toggleOff = options.keepTags && value === filterState.status;
+    filterState.status = (value === '__all__' || toggleOff) ? null : value;
+    if(!options.keepTags) {
+        filterState.tags = {};
+        resetSearchQuery();
     }
-
-    activeFilter = { type: 'master', id: masterId };
-    resetSearchQuery();
-
-    if(currentPage !== 'assets') showAssets({ keepFilter: true });
-    else applyFilters();
-}
-
-/**
- * 稼働状況で絞り込む（ダッシュボードのKPIカードから遷移する導線）
- * @param {string} value - ステータス名 / '__none__'（未設定）/ '__all__'（全件）
- */
-function filterByStatus(value) {
-    activeFilter = (value === '__all__') ? null : { type: 'status', value };
-    resetSearchQuery();
-
-    if(currentPage !== 'assets') showAssets({ keepFilter: true });
-    else applyFilters();
+    showFilteredAssets();
 }
 
 /** 絞り込み条件（検索語以外）を解除 */
 function clearAssetFilter() {
-    activeFilter = null;
-    if(currentPage !== 'assets') showAssets({ keepFilter: true });
-    else applyFilters();
+    filterState = { status: null, tags: {} };
+    showFilteredAssets();
 }
 
 /** 絞り込みと検索の両方を解除 */
 function clearAllFilters() {
-    activeFilter = null;
-    resetSearchQuery();
+    resetFilterState();
     applyFilters();
-}
-
-/**
- * サイドバーの選択状態を、現在の絞り込み条件に合わせて描き直す
- * （DOM側にフラグを持たせず、状態から復元する）
- */
-function updateSidebarFilterState() {
-    document.querySelectorAll('.tree-link').forEach(l => l.classList.remove('active'));
-    document.querySelectorAll('.accordion-header').forEach(h => h.classList.remove('active', 'filtered'));
-    document.querySelectorAll('.nav-label').forEach(l => l.classList.remove('active'));
-
-    // 「全資産一覧」は絞り込みが無いときだけ選択状態にする
-    const navAll = document.getElementById('nav-all');
-    if(navAll) navAll.classList.toggle('active', currentPage === 'assets' && !activeFilter);
-
-    // よく使う絞り込みチップの選択状態
-    document.querySelectorAll('[data-quick-tag]').forEach(btn => {
-        const isActive = !!activeFilter && activeFilter.type === 'tag'
-                       && activeFilter.id === Number(btn.dataset.quickTag);
-        btn.classList.toggle('active', isActive);
-    });
-
-    if(!activeFilter) return;
-
-    if(activeFilter.type === 'tag') {
-        const header = document.querySelector(`.accordion-header[data-tag-id="${activeFilter.id}"]`);
-        if(header) {
-            header.classList.add('active', 'filtered');
-            // 選択されたタグが折り畳みの中にある場合は親を開いて見える位置に出す
-            let parent = header.closest('.accordion-body');
-            while(parent) {
-                const item = parent.closest('.accordion-item');
-                if(item) {
-                    item.classList.add('open');
-                    const body = item.querySelector(':scope > .accordion-body');
-                    if(body) body.style.display = 'block';
-                }
-                parent = item ? item.parentElement.closest('.accordion-body') : null;
-            }
-            const group = header.closest('.nav-group');
-            if(group) group.classList.remove('collapsed');
-        }
-    } else if(activeFilter.type === 'master') {
-        const label = document.querySelector(`.nav-label[data-master-id="${activeFilter.id}"]`);
-        if(label) label.classList.add('active');
-    }
 }

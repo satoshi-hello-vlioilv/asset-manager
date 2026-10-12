@@ -5,15 +5,23 @@
  *
  * 設計:
  *   ダッシュボードの役割は「眺めること」ではなく「次の行動を決めること」。
- *   そのため画面を次の3段で構成している。
  *
- *     1段目: KPI（全体像を数字で1行に）
- *     2段目: 要対応（今日やることを緊急度順に、その場で片付けられる）
- *     3段目: 内訳・最近の動き（文脈の確認）
+ *     1段目: KPIストリップ（全体像を1行の数字に圧縮。押すとその一覧へ）
+ *     2段目左: 要対応（停止中 / 期限超過 / 14日以内 の3グループ、各上位3件）
+ *     2段目右: 稼働状況の内訳・最近の動き（文脈の確認）
  *
- *   要対応の各行には「実施済み」ボタンを置き、
- *   点検 → 履歴に記録 → 次回予定を更新、という一連の作業を1クリックで完了させる。
+ *   要対応は件数が増えても画面を占領しないよう、種別ごとに上位3件だけを出し、
+ *   残りは「すべて表示」で開く（サブ情報はコンパクトに、全体像は崩さない）。
+ *   各行の「実施済み」で、点検 → 履歴に記録 → 次回予定を更新 を1クリックで完了できる。
  */
+
+/* 要対応グループの開閉状態（描き直しても保つ） */
+const actionGroupState = {
+    stop: { collapsed: false, expanded: false },
+    over: { collapsed: false, expanded: false },
+    soon: { collapsed: false, expanded: false }
+};
+const ACTION_GROUP_PREVIEW = 3;
 
 function renderDashboard() {
     const container = document.getElementById('dashboardContainer');
@@ -22,9 +30,10 @@ function renderDashboard() {
     // 編集中の下書きは統計に含めない
     const pool = getPersistedAssets();
     const totalAssets  = pool.length;
-    const activeAssets = pool.filter(a => (a.status || []).includes('稼働中')).length;
-    const inspecting   = pool.filter(a => (a.status || []).includes('点検中') || (a.status || []).includes('修理中')).length;
-    const stopped      = pool.filter(a => (a.status || []).includes('停止中')).length;
+    const has = (a, s) => (a.status || []).includes(s);
+    const activeAssets = pool.filter(a => has(a, '稼働中')).length;
+    const inspecting   = pool.filter(a => has(a, '点検中') || has(a, '修理中')).length;
+    const stopped      = pool.filter(a => has(a, '停止中')).length;
     const activePercent = totalAssets > 0 ? Math.round((activeAssets / totalAssets) * 100) : 0;
 
     const now = new Date();
@@ -35,70 +44,64 @@ function renderDashboard() {
     }).length;
 
     const tasks = collectActionItems();
-    const overdueCount = tasks.filter(t => t.tone === 'danger').length;
+    const groups = groupActionItems(tasks);
+
+    // 稼働状況の比率をKPI内のミニバーで示す（数字と割合を同じ場所で読める）
+    const mix = STATUS_DEFS
+        .map(d => ({ color: d.nodeColor, count: pool.filter(a => has(a, d.value)).length }))
+        .filter(x => x.count > 0);
+    const mixBar = mix.length
+        ? `<span class="kpi-mix">${mix.map(x => `<i style="flex:${x.count}; background:${x.color};"></i>`).join('')}</span>`
+        : '';
+
+    const kpi = (opts) => `
+        <button class="kpi ${opts.onclick ? '' : 'is-static'}" ${opts.onclick ? `onclick="${opts.onclick}"` : 'tabindex="-1"'}
+                ${opts.title ? `title="${escapeHTML(opts.title)}"` : ''} ${opts.tone ? `data-tone="${opts.tone}"` : ''}>
+            <span class="kpi-label">${opts.label}</span>
+            <span class="kpi-value">${opts.value}</span>
+            <span class="kpi-sub">${opts.sub}</span>
+        </button>`;
 
     container.innerHTML = `
-        <div class="dashboard-grid">
-            <div class="stat-card is-clickable" data-tone="neutral" onclick="filterByStatus('__all__')" title="全資産一覧を開く">
-                <div class="stat-label">総資産数</div>
-                <div class="stat-value">${totalAssets}</div>
-                <div class="stat-trend">今月 ${addedThisMonth} 件を追加</div>
-            </div>
-
-            <div class="stat-card is-clickable" data-tone="success" onclick="filterByStatus('稼働中')" title="稼働中の資産だけを表示">
-                <div class="stat-label">稼働率</div>
-                <div class="stat-value" style="color:var(--success);">${activePercent}<span style="font-size:var(--text-md);">%</span></div>
-                <div class="stat-trend">${activeAssets} / ${totalAssets} が稼働中</div>
-            </div>
-
-            <div class="stat-card is-clickable" data-tone="warning" onclick="filterByStatus('点検中')" title="点検中の資産だけを表示">
-                <div class="stat-label">点検・修理中</div>
-                <div class="stat-value" style="color:var(--warning);">${inspecting}</div>
-                <div class="stat-trend">${inspecting > 0 ? '作業が進行中' : '該当なし'}</div>
-            </div>
-
-            <div class="stat-card is-clickable" data-tone="${stopped > 0 ? 'danger' : 'neutral'}" onclick="filterByStatus('停止中')" title="停止中の資産だけを表示">
-                <div class="stat-label">停止中</div>
-                <div class="stat-value" style="color:${stopped > 0 ? 'var(--danger)' : 'var(--text-strong)'};">${stopped}</div>
-                <div class="stat-trend ${stopped > 0 ? 'trend-down' : ''}">${stopped > 0 ? '対応が必要' : '停止中なし'}</div>
-            </div>
-
-            <div class="stat-card" data-tone="${overdueCount > 0 ? 'danger' : 'neutral'}">
-                <div class="stat-label">期限超過</div>
-                <div class="stat-value" style="color:${overdueCount > 0 ? 'var(--danger)' : 'var(--text-strong)'};">${overdueCount}</div>
-                <div class="stat-trend">要対応 ${tasks.length} 件のうち</div>
-            </div>
+        <div class="kpi-strip">
+            ${kpi({ label: '総資産', value: totalAssets, sub: `今月 ${addedThisMonth} 件を追加`,
+                    onclick: "filterByStatus('__all__')", title: '全資産一覧を開く' })}
+            ${kpi({ label: '稼働率', value: `${activePercent}<small>%</small>`, sub: mixBar || `${activeAssets} / ${totalAssets}`,
+                    tone: 'success', onclick: "filterByStatus('稼働中')", title: `${activeAssets} / ${totalAssets} が稼働中。稼働中の資産を表示` })}
+            ${kpi({ label: '停止中', value: stopped, sub: stopped > 0 ? '対応が必要' : '停止中なし',
+                    tone: stopped > 0 ? 'danger' : '', onclick: "filterByStatus('停止中')", title: '停止中の資産だけを表示' })}
+            ${kpi({ label: '点検・修理中', value: inspecting, sub: inspecting > 0 ? '作業が進行中' : '該当なし',
+                    tone: inspecting > 0 ? 'warning' : '', onclick: "filterByStatus('点検中')", title: '点検中の資産を表示' })}
+            ${kpi({ label: '期限超過', value: groups.over.length, sub: '周期計画・期限項目',
+                    tone: groups.over.length > 0 ? 'danger' : '', onclick: "focusActionGroup('over')", title: '要対応の「期限超過」へ' })}
+            ${kpi({ label: '14日以内', value: groups.soon.length, sub: '予定・期限が近いもの',
+                    tone: groups.soon.length > 0 ? 'warning' : '', onclick: "focusActionGroup('soon')", title: '要対応の「14日以内」へ' })}
         </div>
 
         <div class="dashboard-cols">
             <div style="min-width:0;">
-                ${renderActionCenter(tasks)}
-
-                <div class="panel">
-                    <div class="panel-pad" style="padding-bottom:6px;">
-                        <div class="section-head" style="margin-bottom:0;">
-                            <h3 class="section-title"><i class="fa-solid fa-clock-rotate-left"></i> 最近の作業履歴</h3>
-                            <span class="count-pill">直近12件</span>
-                        </div>
-                    </div>
-                    ${renderRecentHistory()}
-                </div>
+                ${renderActionCenter(tasks, groups)}
             </div>
 
-            <div style="min-width:0; display:grid; gap:var(--d-stack);">
+            <div class="dashboard-side">
                 ${renderStatusBreakdown(totalAssets)}
 
                 <div class="panel">
-                    <div class="panel-pad" style="padding-bottom:6px;">
-                        <div class="section-head" style="margin-bottom:0;">
-                            <h3 class="section-title"><i class="fa-solid fa-cubes"></i> 最近追加した資産</h3>
-                            <button class="btn btn-ghost btn-sm" onclick="showAssets()">一覧へ</button>
-                        </div>
+                    <div class="panel-head">
+                        <h3 class="section-title"><i class="fa-solid fa-clock-rotate-left"></i> 最近の作業履歴</h3>
                     </div>
-                    ${renderRecentAssetList()}
+                    ${renderRecentHistory()}
                 </div>
 
                 ${renderRecentlyOpenedPanel()}
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3 class="section-title"><i class="fa-solid fa-cubes"></i> 最近追加した資産</h3>
+                        <button class="btn btn-ghost btn-sm" onclick="showAssets()">一覧へ</button>
+                    </div>
+                    ${renderRecentAssetList()}
+                </div>
             </div>
         </div>
     `;
@@ -164,7 +167,18 @@ function collectActionItems() {
     return items.sort((a, b) => a.sort - b.sort);
 }
 
-function renderActionCenter(items) {
+/**
+ * 要対応を「停止中 / 期限超過 / 14日以内」に分ける
+ */
+function groupActionItems(items) {
+    return {
+        stop: items.filter(i => i.kind === 'status'),
+        over: items.filter(i => i.kind !== 'status' && i.tone === 'danger'),
+        soon: items.filter(i => i.kind !== 'status' && i.tone !== 'danger')
+    };
+}
+
+function renderActionCenter(items, groups) {
     if(items.length === 0) {
         return `
             <div class="all-clear">
@@ -176,46 +190,96 @@ function renderActionCenter(items) {
             </div>`;
     }
 
-    const shown = items.slice(0, 12);
-    const urgent = items.filter(i => i.tone === 'danger').length;
+    const urgent = groups.stop.length + groups.over.length;
+    const defs = [
+        { key: 'stop', label: '停止中',   tone: 'danger',  empty: '停止中の資産はありません' },
+        { key: 'over', label: '期限超過', tone: 'danger',  empty: '期限を過ぎた予定はありません' },
+        { key: 'soon', label: '14日以内', tone: 'warning', empty: '14日以内の予定はありません' }
+    ];
+
+    const row = (item) => {
+        const index = items.indexOf(item);
+        return `
+            <div class="action-row" onclick="openAssetModal('${item.assetId}')" title="クリックして詳細を開く">
+                <span class="action-mark" data-tone="${item.tone}"></span>
+                <span class="action-icon" data-tone="${item.tone}"><i class="fa-solid ${item.icon}"></i></span>
+                <div class="action-main">
+                    <span class="action-title">${escapeHTML(item.title)}</span>
+                    <span class="action-desc">${escapeHTML(item.desc)}</span>
+                </div>
+                <span class="action-when" data-tone="${item.tone}">${escapeHTML(item.when)}</span>
+                <span class="action-quick">${item.kind === 'schedule' ? `
+                        <button class="btn btn-outline btn-sm"
+                                onclick="event.stopPropagation(); completeActionItem(${index});"
+                                title="今日実施したものとして履歴に記録し、次回予定へ進めます">
+                            <i class="fa-solid fa-check"></i> 実施済み
+                        </button>` : ''}</span>
+            </div>`;
+    };
+
+    const section = (def) => {
+        const list = groups[def.key];
+        const state = actionGroupState[def.key];
+        const shown = state.expanded ? list : list.slice(0, ACTION_GROUP_PREVIEW);
+        const rest = list.length - shown.length;
+        return `
+            <div class="action-group ${state.collapsed ? 'is-collapsed' : ''}" id="actionGroup-${def.key}">
+                <button class="action-group-head" onclick="toggleActionGroup('${def.key}')" aria-expanded="${!state.collapsed}">
+                    <i class="fa-solid fa-chevron-down action-group-chevron"></i>
+                    <span class="action-group-dot" data-tone="${list.length ? def.tone : 'neutral'}"></span>
+                    <span class="action-group-title">${def.label}</span>
+                    <span class="count-pill">${list.length}</span>
+                </button>
+                <div class="action-group-body">
+                    ${list.length === 0
+                        ? `<div class="action-group-empty"><i class="fa-solid fa-check"></i> ${def.empty}</div>`
+                        : shown.map(row).join('')}
+                    ${rest > 0 ? `
+                        <button class="action-more" onclick="expandActionGroup('${def.key}', true)">
+                            残り ${rest} 件を表示 <i class="fa-solid fa-chevron-down"></i>
+                        </button>` : ''}
+                    ${state.expanded && list.length > ACTION_GROUP_PREVIEW ? `
+                        <button class="action-more" onclick="expandActionGroup('${def.key}', false)">
+                            上位 ${ACTION_GROUP_PREVIEW} 件に戻す <i class="fa-solid fa-chevron-up"></i>
+                        </button>` : ''}
+                </div>
+            </div>`;
+    };
 
     return `
         <div class="panel action-center">
-            <div class="panel-pad" style="padding-bottom:6px;">
-                <div class="section-head" style="margin-bottom:0;">
-                    <h3 class="section-title">
-                        <i class="fa-solid fa-list-check" style="color:${urgent > 0 ? 'var(--danger)' : 'var(--warning)'};"></i>
-                        要対応
-                    </h3>
-                    <span class="badge ${urgent > 0 ? 'badge-red' : 'badge-orange'}">${items.length}件</span>
-                </div>
+            <div class="panel-head">
+                <h3 class="section-title">
+                    <i class="fa-solid fa-list-check" style="color:${urgent > 0 ? 'var(--danger)' : 'var(--warning)'};"></i>
+                    要対応
+                </h3>
+                <span class="badge ${urgent > 0 ? 'badge-red' : 'badge-orange'}">${items.length}件</span>
             </div>
-            <div class="action-list">
-                ${shown.map((item, i) => `
-                    <div class="action-row" onclick="openAssetModal('${item.assetId}')" title="クリックして詳細を開く">
-                        <span class="action-mark" data-tone="${item.tone}"></span>
-                        <span class="action-icon" data-tone="${item.tone}"><i class="fa-solid ${item.icon}"></i></span>
-                        <div class="action-main">
-                            <span class="action-title">${escapeHTML(item.title)}</span>
-                            <span class="action-desc">${escapeHTML(item.desc)}</span>
-                        </div>
-                        <span class="action-when" data-tone="${item.tone}">${escapeHTML(item.when)}</span>
-                        <span class="action-quick">
-                            ${item.kind === 'schedule' ? `
-                                <button class="btn btn-outline btn-sm"
-                                        onclick="event.stopPropagation(); completeActionItem(${i});"
-                                        title="今日実施したものとして履歴に記録し、次回予定へ進めます">
-                                    <i class="fa-solid fa-check"></i> 実施済み
-                                </button>` : ''}
-                        </span>
-                    </div>`).join('')}
-            </div>
-            ${items.length > shown.length ? `
-                <div style="padding:6px; text-align:center; border-top:1px solid var(--border-subtle);
-                            font-size:var(--text-xs); color:var(--text-sub);">
-                    他 ${items.length - shown.length} 件
-                </div>` : ''}
+            ${defs.map(section).join('')}
         </div>`;
+}
+
+function toggleActionGroup(key) {
+    actionGroupState[key].collapsed = !actionGroupState[key].collapsed;
+    renderDashboard();
+}
+
+function expandActionGroup(key, expanded) {
+    actionGroupState[key].expanded = expanded;
+    renderDashboard();
+}
+
+/** KPIから要対応の該当グループへ移動し、全件を開く */
+function focusActionGroup(key) {
+    actionGroupState[key].collapsed = false;
+    actionGroupState[key].expanded = true;
+    renderDashboard();
+    const el = document.getElementById(`actionGroup-${key}`);
+    if(el) {
+        el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        el.classList.add('is-flash');
+        setTimeout(() => el.classList.remove('is-flash'), 900);
+    }
 }
 
 /**
@@ -316,7 +380,7 @@ function renderRecentAssetList() {
     const recent = getPersistedAssets()
         .slice()
         .sort((a, b) => new Date(b.date) - new Date(a.date))
-        .slice(0, 6);
+        .slice(0, 5);
 
     if(recent.length === 0) {
         return `
@@ -349,15 +413,13 @@ function renderRecentAssetList() {
  * 使用実績が無いうちは表示しない。
  */
 function renderRecentlyOpenedPanel() {
-    const recent = getRecentlyOpenedAssets(5);
+    const recent = getRecentlyOpenedAssets(4);
     if(recent.length < 2) return '';
 
     return `
         <div class="panel">
-            <div class="panel-pad" style="padding-bottom:6px;">
-                <div class="section-head" style="margin-bottom:0;">
-                    <h3 class="section-title"><i class="fa-solid fa-rotate-left"></i> 最近開いた資産</h3>
-                </div>
+            <div class="panel-head">
+                <h3 class="section-title"><i class="fa-solid fa-rotate-left"></i> 最近開いた資産</h3>
             </div>
             ${recent.map(a => `
                 <div class="timeline-row" onclick="openAssetModal('${a.id}')">
@@ -379,7 +441,7 @@ function renderRecentHistory() {
     });
 
     allHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
-    const recent = allHistory.slice(0, 12);
+    const recent = allHistory.slice(0, 8);
 
     if(recent.length === 0) {
         return `

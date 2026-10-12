@@ -186,11 +186,10 @@ function getFrequentEventTexts(limit = 6) {
  * @returns {{autoTags: number[], reason: string|null}}
  */
 function getInitialTagsForNewAsset() {
-    if(activeFilter && activeFilter.type === 'tag') {
-        const tag = tags.find(t => t.id === activeFilter.id);
-        if(tag) {
-            return { autoTags: [tag.id], reason: `絞り込み中の「${tag.name}」を設定しました` };
-        }
+    const ids = getFilterTagIds();
+    if(ids.length > 0) {
+        const names = ids.map(id => tags.find(t => t.id === id).name);
+        return { autoTags: ids, reason: `絞り込み中の「${names.join('」「')}」を設定しました` };
     }
     return { autoTags: [], reason: null };
 }

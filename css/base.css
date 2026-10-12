@@ -194,7 +194,6 @@
     --d-row-py:    6px;   /* テーブル行の上下パディング */
     --d-row-px:    12px;  /* テーブル行の左右パディング */
     --d-card-pad:  14px;  /* カード・パネルの内側 */
-    --d-nav-py:    6px;   /* サイドバー項目の上下 */
     --d-content:   16px;  /* コンテンツ領域の外周 */
     --d-stack:     12px;  /* セクション間の縦の間隔 */
     --d-ctl-h:     30px;  /* 入力・ボタンの標準高さ */
@@ -223,10 +222,8 @@
        ============================================================ */
     --header-height: 52px;
     --contextbar-height: 38px;
-    --sidebar-width: 250px;
 
     --z-sticky: 10;
-    --z-sidebar: 20;
     --z-overlay: 25;
     --z-drawer: 30;
     --z-modal: 100;
@@ -242,7 +239,6 @@ html[data-density="cozy"] {
     --d-row-py:   10px;
     --d-row-px:   16px;
     --d-card-pad: 20px;
-    --d-nav-py:    9px;
     --d-content:  24px;
     --d-stack:    20px;
     --d-ctl-h:    36px;

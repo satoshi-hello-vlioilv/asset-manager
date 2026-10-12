@@ -111,6 +111,18 @@
 .menu-item i:first-child { width: 15px; text-align: center; color: var(--text-faint); font-size: 0.8rem; }
 .menu-item:hover i:first-child { color: var(--primary); }
 .menu-item-sub { font-size: var(--text-2xs); color: var(--text-faint); font-weight: 400; }
+.menu-item > span > .menu-item-sub { display: block; }
+/* 押せない情報行（保存容量など） */
+.menu-item-static { cursor: default; align-items: flex-start; }
+.menu-item-static:hover { background: transparent; }
+.menu-item-static .menu-item-sub { color: var(--text-sub); font-size: var(--text-xs); line-height: 1.5; }
+.menu-footer {
+    display: flex; justify-content: space-between; gap: var(--space-3);
+    margin: 4px -4px -4px; padding: 6px 12px; border-top: 1px solid var(--border);
+    background: var(--surface-sunken); border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    font-size: var(--text-2xs); color: var(--text-faint); white-space: nowrap;
+}
+#moreMenu { max-height: calc(100vh - 70px); overflow-y: auto; }
 .menu-item .kbd { margin-left: auto; }
 .menu-item.is-checked i:first-child { color: var(--primary); }
 .menu-sep { height: 1px; background: var(--border); margin: 4px 0; }

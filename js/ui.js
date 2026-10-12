@@ -1,7 +1,7 @@
 
 /**
  * ui.js
- * 基本UI操作（モーダル / メニュー / アコーディオン / サイドバー / ショートカット一覧）
+ * 基本UI操作（モーダル / メニュー / 表示密度 / ショートカット一覧）
  */
 
 /**
@@ -82,18 +82,6 @@ function setDateFieldToday(inputId) {
     el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-/**
- * サイドバーの開閉（モバイル表示用）
- * @param {boolean} [force] - true:開く / false:閉じる / 省略:トグル
- */
-function toggleSidebar(force) {
-    if(force === undefined) {
-        document.body.classList.toggle('sidebar-open');
-    } else {
-        document.body.classList.toggle('sidebar-open', force);
-    }
-}
-
 /* ============================================================
    ドロップダウンメニュー
    使用頻度の低い操作は、アイコンだけのボタンではなく
@@ -106,9 +94,10 @@ function toggleMenu(id, event) {
     if(!menu) return;
     const wasOpen = menu.classList.contains('open');
     closeMenus();
+    closeFilterPopover();
     if(!wasOpen) {
         menu.classList.add('open');
-        if(id === 'dataMenu') refreshStorageUsage();
+        if(id === 'moreMenu') refreshStorageUsage();
     }
 }
 
@@ -132,20 +121,6 @@ async function refreshStorageUsage() {
 
 function closeMenus() {
     document.querySelectorAll('.menu.open').forEach(m => m.classList.remove('open'));
-}
-
-/**
- * アコーディオンの開閉
- */
-function toggleAccordion(el) {
-    const item = el.parentElement;
-    const body = item.querySelector(':scope > .accordion-body');
-
-    item.classList.toggle('open');
-
-    if(body) {
-        body.style.display = item.classList.contains('open') ? 'block' : 'none';
-    }
 }
 
 /**

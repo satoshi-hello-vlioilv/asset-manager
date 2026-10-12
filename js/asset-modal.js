@@ -5,9 +5,19 @@
  */
 
 /**
+ * v3 でタブを7つから4つに統合した。旧タブIDで呼ばれても該当タブを開けるようにする。
+ */
+const ASSET_TAB_ALIASES = {
+    tabComponents: 'tabBasic',
+    tabSchedule: 'tabPlan',
+    tabMaint: 'tabPlan',
+    tabRisk: 'tabOps'
+};
+
+/**
  * 資産の詳細モーダルを開く
  * @param {string} assetId
- * @param {string} [initialTabId] - 'tabImages' などを渡すと、そのタブから開く
+ * @param {string} [initialTabId] - 'tabImages' / 'tabPlan' などを渡すと、そのタブから開く
  */
 function openAssetModal(assetId, initialTabId) {
     const asset = assets.find(a => a.id === assetId);
@@ -170,19 +180,16 @@ function openAssetModalWithData(asset, initialTabId) {
         deleteBtn.className = 'btn btn-danger-ghost btn-sm';
     }
 
-    // 見出し下の補助情報（登録日・画像枚数など、開く前に知りたい概要）
+    // 見出し下の補助情報
     const metaEl = document.getElementById('modalAssetMeta');
     if(metaEl) {
-        const childCount = getChildAssets(asset.id).length;
-        const parts = [];
-        if(asset.date) parts.push(`導入 ${asset.date}`);
-        if(asset.images.length > 0) parts.push(`画像 ${asset.images.length}枚`);
-        if(childCount > 0) parts.push(`構成パーツ ${childCount}件`);
-        metaEl.textContent = parts.length ? '· ' + parts.join(' · ') : '';
+        // 画像・構成などは概要チップに出すので、ここは導入日だけにする
+        metaEl.textContent = asset.date ? `· 導入 ${asset.date}` : '';
     }
 
     renderDynamicMasterInputs();
     renderCustomFieldInputs(); // カスタムフィールド入力フォームを描画
+    renderComponentsList();
     updateAssetTabCounts();
     updateUnsavedFlag();
     updateNameSuggestions();
@@ -281,29 +288,96 @@ function updateUnsavedFlag() {
 /**
  * タブのラベルに件数を出す
  * 中身があるタブが一目で分かれば、順番に開いて確かめる必要がなくなる。
+ * あわせてヘッダー下の概要チップも最新化する。
  */
 function updateAssetTabCounts() {
     const asset = assets.find(a => a.id === editingAssetId);
     if(!asset) return;
 
-    const set = (id, count) => {
+    const set = (id, count, markEmptyTab = true) => {
         const el = document.getElementById(id);
         if(!el) return;
         el.textContent = count;
+        el.style.display = (!markEmptyTab && count === 0) ? 'none' : '';
         const tab = el.closest('.tab');
-        if(tab) tab.classList.toggle('is-empty', count === 0);
+        if(tab && markEmptyTab) tab.classList.toggle('is-empty', count === 0);
     };
 
+    const schedules = asset.scheduledPlans?.length || 0;
+    const history = asset.maintenance?.length || 0;
     set('tabCountImages', asset.images?.length || 0);
-    set('tabCountComponents', getChildAssets(asset.id).length);
-    set('tabCountSchedule', asset.scheduledPlans?.length || 0);
-    set('tabCountMaint', asset.maintenance?.length || 0);
+    set('tabCountComponents', getChildAssets(asset.id).length, false);
+    set('tabCountPlan', schedules + history);
+    set('tabCountSchedule', schedules);
+    set('tabCountMaint', history);
+
+    renderAssetSummaryChips(asset);
+}
+
+/**
+ * ヘッダー直下の概要チップ
+ * 「次に何をするか」「最後に何をしたか」「期限が迫っている項目」を、タブを開かずに把握できるようにする。
+ */
+function renderAssetSummaryChips(asset) {
+    const el = document.getElementById('assetSummaryChips');
+    if(!el) return;
+    if(isNewAsset) { el.innerHTML = ''; return; }
+
+    const chip = (opts) => `
+        <button class="summary-chip ${opts.muted ? 'is-muted' : ''}" ${opts.tone ? `data-tone="${opts.tone}"` : ''}
+                onclick="openModalTab('${opts.tab}')" title="${escapeHTML(opts.title || '')}">
+            <i class="fa-solid ${opts.icon}"></i>
+            <span class="summary-chip-label">${opts.label}</span>
+            ${opts.pill || ''}
+            <span class="summary-chip-value">${escapeHTML(opts.value)}</span>
+        </button>`;
+
+    const chips = [];
+    const next = getNextSchedule(asset);
+    if(next) {
+        const days = daysUntil(next.date);
+        chips.push(chip({ icon: 'fa-calendar-day', label: '次回予定', tab: 'tabPlan',
+            tone: days < 0 ? 'danger' : '', pill: renderDuePill(days), value: next.event || '',
+            title: `${next.date} ${next.event || ''}` }));
+    } else {
+        chips.push(chip({ icon: 'fa-calendar-day', label: '次回予定', tab: 'tabPlan', value: 'なし', muted: true,
+            title: '周期計画を登録すると、ここに次回の予定が出ます' }));
+    }
+
+    const last = getLatestMaintenance(asset);
+    chips.push(last
+        ? chip({ icon: 'fa-clock-rotate-left', label: '最終実施', tab: 'tabPlan',
+                 value: `${last.date} ${last.event || ''}`, title: `${formatDateRelative(last.date)}に実施` })
+        : chip({ icon: 'fa-clock-rotate-left', label: '最終実施', tab: 'tabPlan', value: '記録なし', muted: true }));
+
+    // タグ固有の期限項目（車検満了日など）
+    checkCustomFieldAlerts().filter(a => a.assetId === asset.id).forEach(alert => {
+        chips.push(chip({ icon: 'fa-bell', label: alert.fieldLabel, tab: 'tabBasic',
+            tone: alert.daysRemaining < 0 ? 'danger' : '', pill: renderDuePill(alert.daysRemaining),
+            value: alert.dueDate, title: `${alert.tagName}：${alert.fieldLabel}` }));
+    });
+
+    const imageCount = asset.images?.length || 0;
+    chips.push(chip({ icon: 'fa-images', label: '画像', tab: 'tabImages',
+        value: imageCount ? `${imageCount}枚` : 'なし', muted: imageCount === 0 }));
+
+    const parent = getParentAsset(asset.id);
+    const childCount = getChildAssets(asset.id).length;
+    if(parent || childCount) {
+        const parts = [];
+        if(parent) parts.push(`親: ${parent.name}`);
+        if(childCount) parts.push(`子 ${childCount}件`);
+        chips.push(chip({ icon: 'fa-sitemap', label: '構成', tab: 'tabBasic', value: parts.join(' / ') }));
+    }
+
+    el.innerHTML = chips.join('');
 }
 
 /**
  * タブIDを指定してタブを開く
  */
 function openModalTab(tabId) {
+    tabId = ASSET_TAB_ALIASES[tabId] || tabId;
     const tabEl = Array.from(document.querySelectorAll('#assetModal .tabs .tab'))
         .find(t => (t.getAttribute('onclick') || '').includes(`'${tabId}'`));
     if(tabEl) switchTab(tabEl, tabId);
@@ -1064,6 +1138,7 @@ function deleteCurrentAsset() {
 // closeModal は js/ui.js で定義（旧版ではここに重複定義があったため統合）
 
 function switchTab(el, tabId) {
+    tabId = ASSET_TAB_ALIASES[tabId] || tabId;
     el.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
     document.querySelectorAll('#assetModal .tab-pane').forEach(p => p.classList.remove('active'));
@@ -1075,8 +1150,8 @@ function switchTab(el, tabId) {
         setupImageDropZone();
     }
 
-    // 構成パーツタブに切り替えた時は子資産一覧を描画
-    if(tabId === 'tabComponents') {
+    // 基本情報タブには構成パーツ（子資産）の一覧も含まれる
+    if(tabId === 'tabBasic') {
         renderComponentsList();
     }
 }
@@ -1145,109 +1220,23 @@ function openAssetStructureModal() {
  */
 function renderComponentsList() {
     const container = document.getElementById('componentsListContainer');
-    const parentContainer = document.getElementById('parentAssetInfoContainer');
-    
     if(!container || !editingAssetId) return;
-    
-    const currentAsset = assets.find(a => a.id === editingAssetId);
-    if(!currentAsset) return;
-    
-    // 子資産を取得
+
+    // 構成パーツ（子資産）を1行1件のコンパクトな形で並べる
     const childAssets = getChildAssets(editingAssetId);
-    
     if(childAssets.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state" style="padding:var(--space-8) var(--space-5);">
-                <i class="fa-solid fa-cubes-stacked empty-state-icon"></i>
-                <div class="empty-state-title">構成パーツはまだありません</div>
-                <div class="empty-state-desc">
-                    「構成を編集」から、この資産の下にぶら下げる資産をつなげられます
-                </div>
-                <button class="btn btn-primary btn-sm" onclick="openAssetStructureModal()">
-                    <i class="fa-solid fa-diagram-project"></i> 構成を編集
-                </button>
-            </div>
-        `;
-    } else {
-        let html = '<div style="display:grid; gap:12px;">';
-        
-        childAssets.forEach(child => {
-            const myTags = tags.filter(t => child.tags.includes(t.id));
-            const statusBadges = renderStatusBadgesHTML(child.status);
-            const thumbnailUrl = getAssetThumbnailUrl(child);
-
-            html += `
-                <div style="display:flex; gap:16px; padding:16px; background:#fff; border:1px solid var(--border); border-radius:var(--radius-md); cursor:pointer; transition:all 0.2s;" 
-                     onmouseover="this.style.boxShadow='var(--shadow-md)'; this.style.borderColor='var(--primary)';" 
-                     onmouseout="this.style.boxShadow=''; this.style.borderColor='var(--border)';"
-                     onclick="openAssetModal('${child.id}')">
-                    <div style="width:80px; height:80px; flex-shrink:0; background:var(--surface-sunken); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; overflow:hidden;">
-                        ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="fa-solid fa-cube" style="font-size:2rem; color:var(--text-sub); opacity:0.3;"></i>`}
-                    </div>
-                    <div style="flex:1;">
-                        <div style="font-weight:600; font-size:1rem; margin-bottom:4px;">${child.name}</div>
-                        <div style="font-size:0.85rem; color:var(--text-sub); margin-bottom:8px;">ID: ${child.id.toUpperCase()}</div>
-                        <div style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px;">
-                            ${statusBadges}
-                        </div>
-                        <div style="display:flex; gap:4px; flex-wrap:wrap;">
-                            ${myTags.slice(0, 4).map(t => `<span class="badge badge-gray" style="font-size:0.75rem;">${t.name}</span>`).join('')}
-                            ${myTags.length > 4 ? `<span class="badge badge-gray" style="font-size:0.75rem;">+${myTags.length - 4}</span>` : ''}
-                        </div>
-                    </div>
-                    <div style="display:flex; align-items:center;">
-                        <i class="fa-solid fa-chevron-right" style="color:var(--text-sub); opacity:0.5;"></i>
-                    </div>
-                </div>
-            `;
-        });
-        
-        html += '</div>';
-        container.innerHTML = html;
+        container.innerHTML = `<div class="component-empty">構成パーツはありません。「構成を編集」でこの資産の下に資産をつなげられます</div>`;
+        return;
     }
-    
-    // 親資産の表示
-    if(parentContainer) {
-        const parentAsset = getParentAsset(editingAssetId);
-        
-        if(!parentAsset) {
-            parentContainer.innerHTML = `
-                <div class="hint hint-neutral">
-                    <i class="fa-solid fa-circle-info"></i>
-                    <span>この資産はどこにも属していない最上位の資産です。「構成を編集」から所属先を設定できます。</span>
-                </div>
-            `;
-        } else {
-            const myTags = tags.filter(t => parentAsset.tags.includes(t.id));
-            const statusBadges = renderStatusBadgesHTML(parentAsset.status);
-            const thumbnailUrl = getAssetThumbnailUrl(parentAsset);
 
-            parentContainer.innerHTML = `
-                <div style="display:flex; gap:16px; padding:16px; background:var(--surface-sunken); border:1px solid var(--border); border-radius:var(--radius-md); cursor:pointer; transition:all 0.2s;" 
-                     onmouseover="this.style.boxShadow='var(--shadow-md)'; this.style.borderColor='var(--primary)';" 
-                     onmouseout="this.style.boxShadow=''; this.style.borderColor='var(--border)';"
-                     onclick="openAssetModal('${parentAsset.id}')">
-                    <div style="width:80px; height:80px; flex-shrink:0; background:#fff; border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; overflow:hidden;">
-                        ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="fa-solid fa-cube" style="font-size:2rem; color:var(--text-sub); opacity:0.3;"></i>`}
-                    </div>
-                    <div style="flex:1;">
-                        <div style="font-weight:600; font-size:1rem; margin-bottom:4px;">${parentAsset.name}</div>
-                        <div style="font-size:0.85rem; color:var(--text-sub); margin-bottom:8px;">ID: ${parentAsset.id.toUpperCase()}</div>
-                        <div style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px;">
-                            ${statusBadges}
-                        </div>
-                        <div style="display:flex; gap:4px; flex-wrap:wrap;">
-                            ${myTags.slice(0, 4).map(t => `<span class="badge badge-gray" style="font-size:0.75rem;">${t.name}</span>`).join('')}
-                            ${myTags.length > 4 ? `<span class="badge badge-gray" style="font-size:0.75rem;">+${myTags.length - 4}</span>` : ''}
-                        </div>
-                    </div>
-                    <div style="display:flex; align-items:center;">
-                        <i class="fa-solid fa-chevron-right" style="color:var(--text-sub); opacity:0.5;"></i>
-                    </div>
-                </div>
-            `;
-        }
-    }
+    container.innerHTML = `<div class="component-list">${childAssets.map(child => `
+        <div class="component-row" onclick="openAssetModal('${child.id}')" title="クリックして開く">
+            <span class="status-dot" style="background:${getAssetStatusColor(child)};"></span>
+            <span class="component-name">${escapeHTML(child.name)}</span>
+            <span class="cell-mono">${escapeHTML(child.id.toUpperCase())}</span>
+            <span class="modal-status">${renderStatusBadgesHTML(child.status || [])}</span>
+            <i class="fa-solid fa-chevron-right" style="color:var(--text-faint); font-size:0.6rem;"></i>
+        </div>`).join('')}</div>`;
 }
 
 /**

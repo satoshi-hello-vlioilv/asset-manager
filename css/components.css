@@ -87,12 +87,14 @@
    リストビュー
    ============================================================ */
 .list-table-wrap {
-    position: relative; overflow: auto; background: var(--surface);
+    position: relative; background: var(--surface);
     border: 1px solid var(--border); border-radius: var(--radius-lg);
+    /* clip は sticky を妨げない（見出し行を画面上端に残すため auto にしない） */
+    overflow: clip;
 }
 .list-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .list-table thead th {
-    position: sticky; top: 0; z-index: 2;
+    position: sticky; top: calc(-1 * var(--d-content)); z-index: 2;
     padding: 6px var(--d-row-px); text-align: left;
     font-weight: 600; font-size: var(--text-xs); color: var(--text-sub);
     white-space: nowrap; cursor: pointer; user-select: none;
@@ -120,7 +122,21 @@
     padding: var(--d-row-py) var(--d-row-px); font-size: var(--text-base);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
 }
-.cell-name { font-weight: 600; color: var(--text-strong); }
+.cell-name { font-weight: 600; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; }
+.cell-name-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.cell-due { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.cell-due .cell-sub { font-size: var(--text-xs); overflow: hidden; text-overflow: ellipsis; }
+
+/* 期限ラベル（超過=赤 / 7日以内=琥珀 / それ以外=灰） */
+.due-pill {
+    display: inline-flex; align-items: center; flex-shrink: 0;
+    font-size: var(--text-2xs); font-weight: 700; padding: 1px 6px; border-radius: var(--radius-sm);
+    white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.due-pill[data-tone="danger"]  { background: var(--danger-bg);  color: var(--danger-fg); }
+.due-pill[data-tone="warning"] { background: var(--warning-bg); color: var(--warning-fg); }
+.due-pill[data-tone="neutral"] { background: var(--surface-muted); color: var(--text-sub); }
 .cell-sub { color: var(--text-sub); }
 .cell-mono { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-sub); }
 .cell-stack { display: flex; gap: 3px; flex-wrap: nowrap; overflow: hidden; }
@@ -149,6 +165,28 @@
 }
 .row-action-btn:hover { background: var(--primary-bg); color: var(--primary); border-color: var(--primary-border); }
 
+/* 狭い画面ではリストを「カード行」に変換する
+   表のまま横スクロールさせると資産名が切れ、何の行か分からなくなるため。
+   1行目 = 状態ドット + 名称、2行目以降 = 次回予定・タグ・状態を折り返して並べる */
+@media (max-width: 640px) {
+    .list-table, .list-table tbody { display: block; }
+    .list-table thead { display: none; }
+    .list-table tbody tr {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
+        padding: 9px 12px;
+    }
+    .list-table tbody td {
+        display: block; width: auto !important; padding: 0; border: none;
+        text-align: left !important; overflow: visible; max-width: 100%;
+    }
+    .list-table tbody td[data-col="name"] { flex: 1 1 100%; overflow: hidden; }
+    .list-table tbody td[data-col="scheduledPlans.next"] { flex: 1 1 100%; }
+    .list-table tbody td.is-empty { display: none; }
+    .list-table tbody td:last-child { position: static; }
+    .cell-stack { flex-wrap: wrap; }
+    .row-actions { display: none; }
+}
+
 /* ============================================================
    ダッシュボード
    ============================================================ */
@@ -158,43 +196,86 @@
 }
 @media (max-width: 1100px) { .dashboard-cols { grid-template-columns: 1fr; } }
 
-.dashboard-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: var(--space-2); margin-bottom: var(--d-stack);
-}
-.stat-card {
-    background: var(--surface); border-radius: var(--radius-lg); padding: 9px 12px;
-    border: 1px solid var(--border);
-    display: flex; flex-direction: column; gap: 1px; text-align: left;
-    transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
-    position: relative; overflow: hidden;
-}
-.stat-card.is-clickable { cursor: pointer; }
-.stat-card.is-clickable:hover { box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+/* 右列（文脈の確認）は縦に積む */
+.dashboard-side { min-width: 0; display: grid; gap: var(--d-stack); align-content: start; }
 
-.stat-card-title, .stat-label {
-    font-size: var(--text-2xs); color: var(--text-sub); font-weight: 600;
-    display: flex; align-items: center; gap: 5px;
+/* パネル見出し（タイトル + 補足操作） */
+.panel-head {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+    padding: 9px var(--d-card-pad) 7px; border-bottom: 1px solid var(--border-subtle);
 }
-.stat-card-value, .stat-value {
-    font-size: var(--text-2xl); font-weight: 700; color: var(--text-strong); line-height: 1.1;
-    letter-spacing: -0.02em;
-}
-.stat-card-change, .stat-trend { font-size: var(--text-2xs); color: var(--text-faint); display: flex; align-items: center; gap: 4px; }
-.stat-up, .trend-up { color: var(--success); }
-.stat-down, .trend-down { color: var(--danger); }
 
-/* 状態別のアクセント（左端の細いバーだけで色を使う） */
-.stat-card[data-tone="success"] { box-shadow: inset 2px 0 0 var(--success); }
-.stat-card[data-tone="warning"] { box-shadow: inset 2px 0 0 var(--warning); }
-.stat-card[data-tone="danger"]  { box-shadow: inset 2px 0 0 var(--danger); }
-.stat-card[data-tone="neutral"] { box-shadow: inset 2px 0 0 var(--n-300); }
+/* ------------------------------------------------------------
+   KPIストリップ — 6つの数字を1行に圧縮し、メイン領域を要対応に譲る
+   ------------------------------------------------------------ */
+.kpi-strip {
+    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    margin-bottom: var(--d-stack); overflow: hidden;
+}
+.kpi {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0;
+    padding: 8px 14px; border: none; border-right: 1px solid var(--border-subtle);
+    background: transparent; font-family: inherit; text-align: left; cursor: pointer;
+    transition: background var(--dur) var(--ease);
+}
+.kpi:last-child { border-right: none; }
+.kpi:hover { background: var(--surface-hover); }
+.kpi.is-static { cursor: default; }
+.kpi.is-static:hover { background: transparent; }
+.kpi-label { font-size: var(--text-2xs); font-weight: 600; color: var(--text-sub); }
+.kpi-value {
+    font-size: var(--text-xl); font-weight: 700; line-height: 1.2; color: var(--text-strong);
+    letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+}
+.kpi-value small { font-size: var(--text-sm); font-weight: 600; margin-left: 1px; }
+.kpi[data-tone="success"] .kpi-value { color: var(--success); }
+.kpi[data-tone="warning"] .kpi-value { color: var(--warning); }
+.kpi[data-tone="danger"]  .kpi-value { color: var(--danger); }
+.kpi-sub {
+    font-size: var(--text-2xs); color: var(--text-faint); width: 100%;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* 稼働状況の比率を示すミニバー */
+.kpi-mix { display: flex; height: 5px; border-radius: var(--radius-full); overflow: hidden; margin-top: 4px; width: 100%; gap: 1px; }
+.kpi-mix i { display: block; min-width: 2px; }
 
 /* ------------------------------------------------------------
    要対応（Action Center）
    ------------------------------------------------------------ */
 .action-center { margin-bottom: var(--d-stack); }
 .action-list { display: flex; flex-direction: column; }
+
+/* 種別ごとのグループ（停止中 / 期限超過 / 14日以内） */
+.action-group { border-top: 1px solid var(--border-subtle); scroll-margin-top: var(--space-3); transition: box-shadow var(--dur-slow) var(--ease); }
+.action-group:first-of-type { border-top: none; }
+.action-group.is-flash { box-shadow: inset 0 0 0 2px var(--primary-border); }
+.action-group-head {
+    display: flex; align-items: center; gap: 7px; width: 100%;
+    padding: 6px var(--d-card-pad); border: none; background: var(--surface-sunken);
+    font-family: inherit; font-size: var(--text-xs); font-weight: 700; color: var(--text-strong);
+    cursor: pointer; text-align: left;
+}
+.action-group-head:hover { background: var(--surface-muted); }
+.action-group-chevron { font-size: 0.55rem; color: var(--text-faint); transition: transform var(--dur) var(--ease); }
+.action-group.is-collapsed .action-group-chevron { transform: rotate(-90deg); }
+.action-group.is-collapsed .action-group-body { display: none; }
+.action-group-dot { width: 7px; height: 7px; border-radius: 50%; }
+.action-group-dot[data-tone="danger"]  { background: var(--danger); }
+.action-group-dot[data-tone="warning"] { background: var(--warning); }
+.action-group-dot[data-tone="neutral"] { background: var(--n-300); }
+.action-group-empty {
+    padding: 7px var(--d-card-pad); font-size: var(--text-xs); color: var(--text-faint);
+    display: flex; align-items: center; gap: 6px;
+}
+.action-group-empty i { color: var(--success); }
+.action-more {
+    display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
+    padding: 5px; border: none; border-top: 1px solid var(--border-subtle); background: transparent;
+    font-family: inherit; font-size: var(--text-xs); font-weight: 600; color: var(--primary); cursor: pointer;
+}
+.action-more:hover { background: var(--primary-bg); }
+.action-more i { font-size: 0.6rem; }
 .action-row {
     display: flex; align-items: center; gap: 8px;
     padding: 6px var(--d-card-pad);
@@ -202,6 +283,7 @@
     cursor: pointer; transition: background var(--dur-fast) var(--ease);
 }
 .action-row:last-child { border-bottom: none; }
+.action-group-body .action-row:last-child { border-bottom: none; }
 .action-row:hover { background: var(--surface-hover); }
 .action-mark {
     width: 4px; align-self: stretch; border-radius: var(--radius-full); flex-shrink: 0;
@@ -233,8 +315,15 @@
 .action-when[data-tone="danger"]  { color: var(--danger); }
 .action-when[data-tone="warning"] { color: var(--warning); }
 .action-when[data-tone="info"]    { color: var(--text-sub); }
-.action-quick { opacity: 0; transition: opacity var(--dur) var(--ease); flex-shrink: 0; }
-.action-row:hover .action-quick, .action-quick:focus-within { opacity: 1; }
+/* 「実施済み」はホバー時に右端へ重ねる（行の高さと日付の位置を揃えたまま出し入れする） */
+.action-row { position: relative; }
+.action-quick {
+    position: absolute; right: var(--d-card-pad); top: 50%; transform: translateY(-50%);
+    padding-left: 24px; background: linear-gradient(to right, transparent, var(--surface-hover) 20px);
+    opacity: 0; pointer-events: none; transition: opacity var(--dur) var(--ease);
+}
+.action-quick:empty { display: none; }
+.action-row:hover .action-quick, .action-quick:focus-within { opacity: 1; pointer-events: auto; }
 
 /* すべて完了している状態 */
 .all-clear {

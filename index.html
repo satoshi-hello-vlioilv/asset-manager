@@ -28,72 +28,23 @@
 <body>
 
 <div class="app-container">
-    <!-- =============================================
-         SIDEBAR — 「どこを見るか」
-         ============================================= -->
-    <aside class="sidebar">
-        <div class="sidebar-header">
-            <span class="sidebar-logo"><i class="fa-solid fa-cube"></i></span>
-            <span>AssetManager</span>
-            <span id="appVersionBadge" class="count-pill" style="margin-left:auto;" title="アプリケーションバージョン"></span>
-        </div>
-        <nav class="sidebar-content" id="sidebarNav" aria-label="メインナビゲーション">
-            <!-- Dynamic Menu -->
-        </nav>
-        <div class="sidebar-footer">
-            <div class="nav-item" onclick="openMasterModal()" title="タグ階層とカスタムフィールドを編集します">
-                <i class="fa-solid fa-sitemap"></i>
-                <span class="nav-item-text">マスタ・タグ設定</span>
-            </div>
-            <div class="menu-wrap">
-                <div class="nav-item" onclick="toggleMenu('dataMenu', event)" aria-haspopup="true">
-                    <i class="fa-solid fa-database"></i>
-                    <span class="nav-item-text">データ管理</span>
-                    <i class="fa-solid fa-chevron-up" style="font-size:0.6rem; width:auto;"></i>
-                </div>
-                <div class="menu" id="dataMenu" style="bottom:calc(100% + 6px); top:auto; left:0; right:0;">
-                    <div class="menu-label">バックアップ</div>
-                    <button class="menu-item" onclick="closeMenus(); exportToZIP();">
-                        <i class="fa-solid fa-file-zipper"></i>
-                        <span>ZIPでバックアップ<span class="menu-item-sub" style="display:block;">データと画像をまとめて保存</span></span>
-                    </button>
-                    <button class="menu-item" onclick="closeMenus(); document.getElementById('importFile').click();">
-                        <i class="fa-solid fa-file-arrow-up"></i>
-                        <span>バックアップから復元<span class="menu-item-sub" style="display:block;">ZIP / 旧形式のJSONに対応</span></span>
-                    </button>
-                    <div class="menu-sep"></div>
-                    <div class="menu-label">保存状況</div>
-                    <div class="menu-item" style="cursor:default; align-items:flex-start;" id="storageUsageRow">
-                        <i class="fa-solid fa-database"></i>
-                        <span id="storageUsageText" style="font-weight:400; color:var(--text-sub); font-size:var(--text-xs);">集計中…</span>
-                    </div>
-                    <div class="menu-sep"></div>
-                    <button class="menu-item is-danger" onclick="closeMenus(); clearDatabase();">
-                        <i class="fa-solid fa-trash-can"></i>
-                        <span>すべてのデータを消去</span>
-                    </button>
-                </div>
-            </div>
-            <div class="sidebar-footer-row">
-                <span title="データはこのブラウザのIndexedDBに自動保存されます">自動保存</span>
-                <span id="autoSaveIndicator" title="最終保存時刻"></span>
-            </div>
-        </div>
-    </aside>
-
-    <!-- モバイル表示時のサイドバー用オーバーレイ -->
-    <div class="sidebar-overlay" onclick="toggleSidebar(false)" aria-hidden="true"></div>
-
-    <!-- =============================================
-         MAIN — 「何をするか」
-         ============================================= -->
     <main class="main">
+        <!-- =============================================
+             HEADER — 「どこを見るか・何をするか」
+             ページ切替タブ + 検索・表示切替 + 主要操作
+             ============================================= -->
         <header class="header">
             <div class="header-left">
-                <button class="btn btn-ghost btn-icon-only sidebar-toggle" onclick="toggleSidebar()" title="メニュー" aria-label="サイドバーを開閉">
-                    <i class="fa-solid fa-bars"></i>
-                </button>
-                <h1 id="pageTitle" class="page-title">ダッシュボード</h1>
+                <span class="app-logo" id="appLogo" title="AssetManager"><i class="fa-solid fa-cube"></i></span>
+                <nav class="top-nav" aria-label="メインナビゲーション">
+                    <button class="top-nav-item" id="navDashboard" onclick="showDashboard()" title="ダッシュボード (G → D)">
+                        <i class="fa-solid fa-gauge-high"></i><span class="top-nav-label">ダッシュボード</span>
+                    </button>
+                    <button class="top-nav-item" id="navAssets" onclick="showAssets()" title="資産一覧 (G → A)">
+                        <i class="fa-solid fa-layer-group"></i><span class="top-nav-label">資産一覧</span>
+                        <span class="count-pill" id="navAssetCount"></span>
+                    </button>
+                </nav>
             </div>
 
             <!-- 絞り込み・表示に関する道具（狭い画面では2段目に回り込む） -->
@@ -111,7 +62,7 @@
                 </div>
 
                 <!-- 全体検索（コマンドパレット） -->
-                <button class="btn btn-outline btn-sm" onclick="openPalette()" title="資産・タグ・操作を横断検索">
+                <button class="btn btn-outline btn-sm" onclick="openPalette()" title="資産・タグ・操作を横断検索 (Ctrl+K)">
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <span class="hide-sm">検索</span>
                     <span class="kbd hide-md">Ctrl K</span>
@@ -119,13 +70,13 @@
 
                 <!-- 表示切替（資産一覧でのみ表示） -->
                 <div class="segmented" id="viewToggle" style="display:none;" role="group" aria-label="表示形式">
-                    <button class="btn btn-sm" id="btnViewList" onclick="switchAssetView('list')" title="リスト表示：項目を比較したいとき">
+                    <button class="btn btn-sm" id="btnViewList" onclick="switchAssetView('list')" title="リスト表示：項目を比較したいとき (1)">
                         <i class="fa-solid fa-list"></i><span class="hide-lg">リスト</span>
                     </button>
-                    <button class="btn btn-sm btn-ghost" id="btnViewCard" onclick="switchAssetView('card')" title="カード表示：見た目で探したいとき">
+                    <button class="btn btn-sm btn-ghost" id="btnViewCard" onclick="switchAssetView('card')" title="カード表示：見た目で探したいとき (2)">
                         <i class="fa-solid fa-grip"></i><span class="hide-lg">カード</span>
                     </button>
-                    <button class="btn btn-sm btn-ghost" id="btnViewCalendar" onclick="switchAssetView('calendar')" title="カレンダー表示：予定を確認したいとき">
+                    <button class="btn btn-sm btn-ghost" id="btnViewCalendar" onclick="switchAssetView('calendar')" title="カレンダー表示：予定を確認したいとき (3)">
                         <i class="fa-solid fa-calendar"></i><span class="hide-lg">カレンダー</span>
                     </button>
                 </div>
@@ -137,7 +88,12 @@
             </div>
 
             <div class="header-right">
-                <div class="header-divider hide-sm" id="divider1"></div>
+                <!-- 自動保存の状態（静かに、しかし常に見える場所に） -->
+                <span class="autosave-indicator hide-md" id="autoSaveIndicator" title="データはこのブラウザのIndexedDBに自動保存されます"></span>
+
+                <button class="btn btn-ghost btn-sm hide-sm" onclick="openMasterModal()" title="タグ階層とカスタムフィールドを編集します">
+                    <i class="fa-solid fa-sitemap"></i><span class="hide-md">マスタ・タグ設定</span>
+                </button>
 
                 <!-- その他の操作（ラベル付きメニューに集約） -->
                 <div class="menu-wrap">
@@ -146,14 +102,28 @@
                         <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
                     <div class="menu" id="moreMenu">
+                        <div class="menu-label">データ</div>
+                        <button class="menu-item" onclick="closeMenus(); exportToZIP();">
+                            <i class="fa-solid fa-file-zipper"></i>
+                            <span>ZIPでバックアップ<span class="menu-item-sub">データと画像をまとめて保存</span></span>
+                        </button>
+                        <button class="menu-item" onclick="closeMenus(); document.getElementById('importFile').click();">
+                            <i class="fa-solid fa-file-arrow-up"></i>
+                            <span>バックアップから復元<span class="menu-item-sub">ZIP / 旧形式のJSONに対応</span></span>
+                        </button>
+                        <div class="menu-item menu-item-static" id="storageUsageRow">
+                            <i class="fa-solid fa-database"></i>
+                            <span id="storageUsageText" class="menu-item-sub">集計中…</span>
+                        </div>
+                        <div class="menu-sep"></div>
                         <div class="menu-label">表示</div>
                         <button class="menu-item" id="menuDensityCompact" onclick="setDensity('compact')">
                             <i class="fa-solid fa-check"></i>
-                            <span>コンパクト<span class="menu-item-sub" style="display:block;">一度に多くの行を表示</span></span>
+                            <span>コンパクト<span class="menu-item-sub">一度に多くの行を表示</span></span>
                         </button>
                         <button class="menu-item" id="menuDensityCozy" onclick="setDensity('cozy')">
                             <i class="fa-solid fa-check"></i>
-                            <span>ゆったり<span class="menu-item-sub" style="display:block;">文字と余白を大きく</span></span>
+                            <span>ゆったり<span class="menu-item-sub">文字と余白を大きく</span></span>
                         </button>
                         <div class="menu-sep"></div>
                         <div class="menu-label">設定</div>
@@ -163,40 +133,42 @@
                         <button class="menu-item" onclick="closeMenus(); openListSettingsModal();">
                             <i class="fa-solid fa-table-columns"></i><span>リストの列を設定</span>
                         </button>
-                        <div class="menu-sep"></div>
-                        <div class="menu-label">データ</div>
-                        <button class="menu-item" onclick="closeMenus(); exportToZIP();">
-                            <i class="fa-solid fa-file-zipper"></i><span>ZIPでバックアップ</span>
-                        </button>
-                        <button class="menu-item" onclick="closeMenus(); document.getElementById('importFile').click();">
-                            <i class="fa-solid fa-file-arrow-up"></i><span>バックアップから復元</span>
-                        </button>
-                        <div class="menu-sep"></div>
                         <button class="menu-item" onclick="closeMenus(); openKeyHelp();">
                             <i class="fa-solid fa-keyboard"></i><span>ショートカット一覧</span><span class="kbd">?</span>
                         </button>
+                        <div class="menu-sep"></div>
+                        <button class="menu-item is-danger" onclick="closeMenus(); clearDatabase();">
+                            <i class="fa-solid fa-trash-can"></i>
+                            <span>すべてのデータを消去</span>
+                        </button>
+                        <div class="menu-footer">
+                            <span>AssetManager <span id="appVersionBadge"></span></span>
+                            <span>データはこのブラウザに自動保存</span>
+                        </div>
                     </div>
                 </div>
                 <input type="file" id="importFile" accept=".zip,.json" style="display:none;" onchange="importFromJSON(event)">
 
                 <!-- 主要動線：1画面に1つだけの primary -->
-                <button class="btn btn-primary btn-sm" onclick="createNewAsset()" id="btnCreateAsset" title="新しい資産を登録します">
+                <button class="btn btn-primary btn-sm" onclick="createNewAsset()" id="btnCreateAsset" title="新しい資産を登録します (N)">
                     <i class="fa-solid fa-plus"></i> <span class="hide-sm">新規資産</span>
-                    <span class="kbd hide-md" style="background:rgba(255,255,255,0.18); border-color:rgba(255,255,255,0.3); color:#fff;">N</span>
+                    <span class="kbd kbd-on-primary hide-md">N</span>
                 </button>
             </div>
         </header>
 
         <!-- =============================================
-             CONTEXT BAR — 「今どういう状態か」
-             適用中の絞り込みと件数を常時提示する
+             FILTER BAR — 「今どういう状態か」
+             稼働状況・マスタごとの条件・件数を常時提示する（資産一覧のみ）
              ============================================= -->
-        <div class="context-bar" id="contextBar">
-            <span class="context-count" id="contextCount"></span>
-            <div id="contextChips" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;"></div>
-            <button class="btn btn-ghost btn-sm" id="contextClear" onclick="clearAllFilters()" style="display:none;">
-                <i class="fa-solid fa-rotate-left"></i> 条件をすべて解除
+        <div class="filter-bar" id="filterBar">
+            <div class="status-seg" id="filterStatus" role="group" aria-label="稼働状況で絞り込む"></div>
+            <div class="filter-masters" id="filterMasters"></div>
+            <span id="filterQueryChip"></span>
+            <button class="btn btn-ghost btn-sm" id="filterClear" onclick="clearAllFilters()" style="display:none;">
+                <i class="fa-solid fa-rotate-left"></i> すべて解除
             </button>
+            <span class="filter-count" id="filterCount"></span>
         </div>
 
         <div class="content-scroll">
@@ -210,6 +182,9 @@
         </div>
     </main>
 </div>
+
+<!-- マスタ別の絞り込み（タグ階層ツリー） -->
+<div class="filter-popover" id="filterPopover" role="dialog" aria-label="タグで絞り込む"></div>
 
 <!-- =============================================
      COMMAND PALETTE (Ctrl+K)
@@ -239,13 +214,14 @@
     <div class="modal-large" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-header">
             <div class="modal-title-block">
+                <!-- 名称と状態を1行に（見出しの縦幅を抑え、本文の表示領域を確保する） -->
                 <div class="modal-title-row">
-                    <span id="modalStatusBadge" class="badge badge-green">稼働中</span>
+                    <h3 id="modalTitle">資産詳細</h3>
+                    <span id="modalStatusBadge" class="modal-status"></span>
                     <span class="unsaved-flag" id="assetUnsavedFlag">
                         <i class="fa-solid fa-circle" style="font-size:0.4rem;"></i> 未保存の変更があります
                     </span>
                 </div>
-                <h3 id="modalTitle">資産詳細</h3>
                 <div class="modal-meta-row">
                     <span id="modalAssetId" class="mono">ID: 12345</span>
                     <span id="modalAssetMeta"></span>
@@ -268,26 +244,25 @@
             </div>
         </div>
 
+        <!-- 概要チップ：開いてすぐ知りたい「次回予定・最終実施・期限・画像・構成」を1行で
+             （押すと該当タブへ。狭い画面では横にスクロール） -->
+        <div class="summary-chips" id="assetSummaryChips"></div>
+
         <div class="tabs" role="tablist">
-            <div class="tab active" onclick="switchTab(this, 'tabBasic')" role="tab">基本情報</div>
+            <div class="tab active" onclick="switchTab(this, 'tabBasic')" role="tab">
+                基本情報 <span class="count-pill" id="tabCountComponents" title="構成パーツ（子資産）の数">0</span>
+            </div>
             <div class="tab" onclick="switchTab(this, 'tabImages')" role="tab">
                 画像 <span class="count-pill" id="tabCountImages">0</span>
             </div>
-            <div class="tab" onclick="switchTab(this, 'tabComponents')" role="tab">
-                構成パーツ <span class="count-pill" id="tabCountComponents">0</span>
+            <div class="tab" onclick="switchTab(this, 'tabPlan')" role="tab">
+                計画・履歴 <span class="count-pill" id="tabCountPlan">0</span>
             </div>
-            <div class="tab" onclick="switchTab(this, 'tabOps')" role="tab">運用基準・手順</div>
-            <div class="tab" onclick="switchTab(this, 'tabRisk')" role="tab">リスク管理・安全</div>
-            <div class="tab" onclick="switchTab(this, 'tabSchedule')" role="tab">
-                周期計画 <span class="count-pill" id="tabCountSchedule">0</span>
-            </div>
-            <div class="tab" onclick="switchTab(this, 'tabMaint')" role="tab">
-                履歴 <span class="count-pill" id="tabCountMaint">0</span>
-            </div>
+            <div class="tab" onclick="switchTab(this, 'tabOps')" role="tab">運用・安全</div>
         </div>
 
         <div class="modal-body tab-content-area">
-            <!-- Tab 1: 基本情報 -->
+            <!-- Tab 1: 基本情報（構成＝親子関係も同じ画面で確認する） -->
             <div id="tabBasic" class="tab-pane active">
                 <div class="tab-stack">
                     <div class="form-card">
@@ -330,11 +305,23 @@
                     <div class="form-card">
                         <div class="section-head">
                             <div>
-                                <h4 class="section-title"><i class="fa-solid fa-sitemap"></i> 所属先（親資産）</h4>
-                                <p class="section-desc">この資産が別の資産の一部である場合に設定します</p>
+                                <h4 class="section-title"><i class="fa-solid fa-sitemap"></i> 構成（親子関係）</h4>
+                                <p class="section-desc">この資産の所属先と、この資産を構成するパーツ</p>
+                            </div>
+                            <button class="btn btn-outline btn-sm" onclick="openAssetStructureModal()">
+                                <i class="fa-solid fa-pen"></i> 構成を編集
+                            </button>
+                        </div>
+                        <div class="structure-grid">
+                            <div>
+                                <div class="field-label structure-label"><i class="fa-solid fa-arrow-turn-up"></i> 所属先（親資産）</div>
+                                <div id="parentAssetSelectContainer"></div>
+                            </div>
+                            <div>
+                                <div class="field-label structure-label"><i class="fa-solid fa-diagram-project"></i> 構成パーツ（子資産）</div>
+                                <div id="componentsListContainer"></div>
                             </div>
                         </div>
-                        <div id="parentAssetSelectContainer"></div>
                     </div>
                 </div>
             </div>
@@ -374,7 +361,7 @@
 
                         <!-- URL入力（代替手段なので普段は畳んでおく） -->
                         <div id="imageUrlForm" style="display:none; margin-bottom:var(--space-4);">
-                            <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:var(--space-3); align-items:end;">
+                            <div class="image-url-grid">
                                 <div class="field">
                                     <label class="field-label" for="newImageUrl">画像URL</label>
                                     <input type="text" id="newImageUrl" class="input" placeholder="https://…">
@@ -383,7 +370,7 @@
                                     <label class="field-label" for="newImageComment">説明（任意）</label>
                                     <input type="text" id="newImageComment" class="input" placeholder="画像の説明やメモ">
                                 </div>
-                                <button class="btn btn-outline" onclick="addImageFromUrl()" style="height:38px;">
+                                <button class="btn btn-outline" onclick="addImageFromUrl()">
                                     <i class="fa-solid fa-plus"></i> 追加
                                 </button>
                             </div>
@@ -394,140 +381,101 @@
                 </div>
             </div>
 
-            <!-- Tab 3: 構成パーツ -->
-            <div id="tabComponents" class="tab-pane">
-                <div class="tab-stack">
-                    <div class="form-card">
+            <!-- Tab 3: 計画・履歴（予定と実績を並べて見比べる） -->
+            <div id="tabPlan" class="tab-pane">
+                <div class="plan-grid">
+                    <section class="plan-col">
                         <div class="section-head">
-                            <div>
-                                <h4 class="section-title"><i class="fa-solid fa-diagram-project"></i> 構成パーツ（子資産）</h4>
-                                <p class="section-desc">この資産を親として登録されている資産の一覧</p>
-                            </div>
-                            <button class="btn btn-outline btn-sm" onclick="openAssetStructureModal()">
-                                <i class="fa-solid fa-pen"></i> 構成を編集
-                            </button>
-                        </div>
-                        <div id="componentsListContainer"></div>
-                    </div>
-
-                    <div class="form-card">
-                        <h4 class="section-title" style="margin-bottom:var(--space-3);">
-                            <i class="fa-solid fa-arrow-turn-up"></i> 所属先（親資産）
-                        </h4>
-                        <div id="parentAssetInfoContainer"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tab 4: 運用基準・手順 -->
-            <div id="tabOps" class="tab-pane">
-                <div class="tab-stack">
-                    <div class="form-card">
-                        <h4 class="section-title" style="margin-bottom:var(--space-3);">
-                            <i class="fa-solid fa-book-open" style="color:var(--primary);"></i> 標準操作手順
-                        </h4>
-                        <textarea id="editOperationsProcedure" class="input" rows="6"
-                                  placeholder="始業時の操作手順、終業時の手順、通常運転時の手順など"></textarea>
-                    </div>
-
-                    <div class="form-card">
-                        <h4 class="section-title" style="margin-bottom:var(--space-3);">
-                            <i class="fa-solid fa-list-check" style="color:var(--success);"></i> 点検チェックポイント
-                        </h4>
-                        <textarea id="editOperationsCheckpoints" class="input" rows="6"
-                                  placeholder="始業前点検項目、定期点検項目、異常時の確認事項など"></textarea>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tab 5: リスク管理・安全 -->
-            <div id="tabRisk" class="tab-pane">
-                <div class="tab-stack">
-                    <div class="form-card">
-                        <h4 class="section-title" style="margin-bottom:var(--space-3);">
-                            <i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i> リスク評価
-                        </h4>
-                        <textarea id="editRiskAssessment" class="input" rows="6"
-                                  placeholder="想定されるリスク、危険性、発生時の影響度など&#10;例：挟まれ・巻き込まれ、転倒・転落、感電、火災など"></textarea>
-                    </div>
-
-                    <div class="form-card">
-                        <h4 class="section-title" style="margin-bottom:var(--space-3);">
-                            <i class="fa-solid fa-shield-halved" style="color:var(--success);"></i> 安全対策・予防措置
-                        </h4>
-                        <textarea id="editRiskMeasures" class="input" rows="6"
-                                  placeholder="安全装置、保護具の使用、作業手順、教育訓練、緊急時対応など"></textarea>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tab 6: 周期計画 -->
-            <div id="tabSchedule" class="tab-pane">
-                <div class="tab-stack">
-                    <div class="inline-form" style="grid-template-columns:150px 120px minmax(0,1fr) auto;">
-                        <div class="field">
-                            <label class="field-label" for="newScheduleDate">実施予定日</label>
-                            <input type="date" id="newScheduleDate" class="input">
-                        </div>
-                        <div class="field">
-                            <label class="field-label" for="newScheduleCycle">周期（日）</label>
-                            <input type="number" id="newScheduleCycle" class="input" placeholder="任意" min="1"
-                                   oninput="updateScheduleDateFromCycle()">
-                        </div>
-                        <div class="field">
-                            <label class="field-label" for="newScheduleEvent">実施内容</label>
-                            <input type="text" id="newScheduleEvent" class="input" placeholder="例: 定期点検"
-                                   list="eventSuggestions" autocomplete="off">
-                        </div>
-                        <button class="btn btn-primary" onclick="addScheduleRecord()">
-                            <i class="fa-solid fa-plus"></i> 追加
-                        </button>
-                        <!-- よく使う周期と実施内容をワンクリックで入れる -->
-                        <div class="suggest-row" style="grid-column:1/-1;" id="scheduleSuggestRow"></div>
-                    </div>
-
-                    <div>
-                        <div class="section-head">
-                            <h4 class="section-title"><i class="fa-solid fa-calendar-check"></i> 周期計画一覧</h4>
+                            <h4 class="section-title"><i class="fa-solid fa-calendar-check"></i> 周期計画 <span class="count-pill" id="tabCountSchedule">0</span></h4>
                             <div class="segmented">
                                 <button class="btn btn-sm" onclick="sortSchedule('desc')" id="sortScheduleDescBtn">新しい順</button>
                                 <button class="btn btn-sm btn-ghost" onclick="sortSchedule('asc')" id="sortScheduleAscBtn">古い順</button>
                             </div>
                         </div>
+                        <div class="inline-form plan-form-schedule">
+                            <div class="field">
+                                <label class="field-label" for="newScheduleDate">実施予定日</label>
+                                <input type="date" id="newScheduleDate" class="input">
+                            </div>
+                            <div class="field">
+                                <label class="field-label" for="newScheduleCycle">周期（日）</label>
+                                <input type="number" id="newScheduleCycle" class="input" placeholder="任意" min="1"
+                                       oninput="updateScheduleDateFromCycle()">
+                            </div>
+                            <div class="field plan-form-event">
+                                <label class="field-label" for="newScheduleEvent">実施内容</label>
+                                <input type="text" id="newScheduleEvent" class="input" placeholder="例: 定期点検"
+                                       list="eventSuggestions" autocomplete="off"
+                                       onkeydown="if(event.key==='Enter'){event.preventDefault(); addScheduleRecord();}">
+                            </div>
+                            <button class="btn btn-primary" onclick="addScheduleRecord()">
+                                <i class="fa-solid fa-plus"></i> 追加
+                            </button>
+                            <!-- よく使う周期と実施内容をワンクリックで入れる -->
+                            <div class="suggest-row" style="grid-column:1/-1;" id="scheduleSuggestRow"></div>
+                        </div>
                         <div id="scheduleRecordsContainer" class="panel"></div>
-                    </div>
-                </div>
-            </div>
+                    </section>
 
-            <!-- Tab 7: 履歴 -->
-            <div id="tabMaint" class="tab-pane">
-                <div class="tab-stack">
-                    <div class="inline-form" style="grid-template-columns:150px minmax(0,1fr) auto;">
-                        <div class="field">
-                            <label class="field-label" for="newHistoryDate">実施日</label>
-                            <input type="date" id="newHistoryDate" class="input">
-                        </div>
-                        <div class="field">
-                            <label class="field-label" for="newHistoryEvent">実施内容</label>
-                            <input type="text" id="newHistoryEvent" class="input" placeholder="実施した作業や発生したイベントを記入"
-                                   list="eventSuggestions" autocomplete="off"
-                                   onkeydown="if(event.key==='Enter'){event.preventDefault(); addHistoryRecord();}">
-                        </div>
-                        <button class="btn btn-primary" onclick="addHistoryRecord()">
-                            <i class="fa-solid fa-plus"></i> 追加
-                        </button>
-                        <div class="suggest-row" style="grid-column:1/-1;" id="historySuggestRow"></div>
-                    </div>
-
-                    <div>
+                    <section class="plan-col">
                         <div class="section-head">
-                            <h4 class="section-title"><i class="fa-solid fa-clock-rotate-left"></i> 履歴一覧</h4>
+                            <h4 class="section-title"><i class="fa-solid fa-clock-rotate-left"></i> 履歴 <span class="count-pill" id="tabCountMaint">0</span></h4>
                             <div class="segmented">
                                 <button class="btn btn-sm" onclick="sortHistory('desc')" id="sortDescBtn">新しい順</button>
                                 <button class="btn btn-sm btn-ghost" onclick="sortHistory('asc')" id="sortAscBtn">古い順</button>
                             </div>
                         </div>
+                        <div class="inline-form plan-form-history">
+                            <div class="field">
+                                <label class="field-label" for="newHistoryDate">実施日</label>
+                                <input type="date" id="newHistoryDate" class="input">
+                            </div>
+                            <div class="field plan-form-event">
+                                <label class="field-label" for="newHistoryEvent">実施内容</label>
+                                <input type="text" id="newHistoryEvent" class="input" placeholder="実施した作業や発生したイベント"
+                                       list="eventSuggestions" autocomplete="off"
+                                       onkeydown="if(event.key==='Enter'){event.preventDefault(); addHistoryRecord();}">
+                            </div>
+                            <button class="btn btn-primary" onclick="addHistoryRecord()">
+                                <i class="fa-solid fa-plus"></i> 追加
+                            </button>
+                            <div class="suggest-row" style="grid-column:1/-1;" id="historySuggestRow"></div>
+                        </div>
                         <div id="historyRecordsContainer" class="panel"></div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Tab 4: 運用・安全（手順とリスクを1画面で） -->
+            <div id="tabOps" class="tab-pane">
+                <div class="ops-grid">
+                    <div class="form-card">
+                        <h4 class="section-title ops-title">
+                            <i class="fa-solid fa-book-open" style="color:var(--primary);"></i> 標準操作手順
+                        </h4>
+                        <textarea id="editOperationsProcedure" class="input" rows="7"
+                                  placeholder="始業時の操作手順、終業時の手順、通常運転時の手順など"></textarea>
+                    </div>
+                    <div class="form-card">
+                        <h4 class="section-title ops-title">
+                            <i class="fa-solid fa-list-check" style="color:var(--success);"></i> 点検チェックポイント
+                        </h4>
+                        <textarea id="editOperationsCheckpoints" class="input" rows="7"
+                                  placeholder="始業前点検項目、定期点検項目、異常時の確認事項など"></textarea>
+                    </div>
+                    <div class="form-card">
+                        <h4 class="section-title ops-title">
+                            <i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i> リスク評価
+                        </h4>
+                        <textarea id="editRiskAssessment" class="input" rows="7"
+                                  placeholder="想定されるリスク、危険性、発生時の影響度など&#10;例：挟まれ・巻き込まれ、転倒・転落、感電、火災など"></textarea>
+                    </div>
+                    <div class="form-card">
+                        <h4 class="section-title ops-title">
+                            <i class="fa-solid fa-shield-halved" style="color:var(--success);"></i> 安全対策・予防措置
+                        </h4>
+                        <textarea id="editRiskMeasures" class="input" rows="7"
+                                  placeholder="安全装置、保護具の使用、作業手順、教育訓練、緊急時対応など"></textarea>
                     </div>
                 </div>
             </div>
@@ -553,9 +501,9 @@
 <div class="modal-overlay" id="masterModal">
     <div class="modal-full">
         <!-- Editor Header -->
-        <div style="padding:var(--space-3) var(--space-5); background:var(--surface); border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:var(--space-4); flex-wrap:wrap; z-index:10;">
-            <div style="display:flex; align-items:center; gap:var(--space-4); flex-wrap:wrap;">
-                <div style="font-weight:700; font-size:var(--text-md); display:flex; align-items:center; gap:var(--space-2); color:var(--text-strong);">
+        <div class="master-header">
+            <div class="master-header-left">
+                <div class="master-header-title">
                     <i class="fa-solid fa-layer-group" style="color:var(--primary);"></i>
                     <span id="masterModalTitle">マスタ構成編集</span>
                 </div>
@@ -591,17 +539,10 @@
         <!-- エディターエリアコンテナ -->
         <div style="flex:1; min-height:0; overflow:hidden; position:relative;">
             <div class="editor-layout" id="tagsEditorArea">
-                <!-- Left Category Select -->
-                <div class="editor-sidebar">
-                    <div class="nav-section-label" style="padding-left:8px;">編集対象のマスタ</div>
-                    <div id="masterCategoryList"></div>
-                    <button class="btn btn-ghost btn-sm" style="width:100%; margin-top:var(--space-2); border:1px dashed var(--border-strong);" onclick="addNewMasterDefinition()">
-                        <i class="fa-solid fa-plus"></i> 新規マスタ定義
-                    </button>
-                </div>
-
-                <!-- Main Editor Area -->
+                <!-- 編集対象のマスタ（上部タブ。左に固定の列を置かず、ツリーの横幅を確保する） -->
                 <div class="editor-main" id="editorArea">
+                    <div class="master-tabs" id="masterCategoryList" role="tablist" aria-label="編集対象のマスタ"></div>
+
                     <!-- 1. LIST VIEW -->
                     <div id="listView" class="list-editor-container"></div>
 

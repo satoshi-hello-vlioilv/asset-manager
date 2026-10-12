@@ -340,8 +340,7 @@ function applyImportedData(data, options = {}) {
 /** 取り込み後に画面を作り直す（列定義もタグ階層も入れ替わっているため） */
 function refreshAfterImport() {
     addCustomFieldColumns();
-    activeFilter = null;
-    searchQuery = '';
+    resetFilterState();
     invalidateSuggestionCaches();
     renderSidebar();
     refreshCurrentView();

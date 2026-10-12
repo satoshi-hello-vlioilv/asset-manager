@@ -44,7 +44,9 @@
     background: var(--surface); flex-shrink: 0;
 }
 .modal-title-block { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.modal-title-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.modal-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.modal-title-row h3 { min-width: 0; }
+.modal-status { display: inline-flex; gap: 4px; flex-shrink: 0; }
 .modal-title-block h3 {
     margin: 0; font-size: var(--text-lg); font-weight: 700; color: var(--text-strong);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -100,6 +102,65 @@
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px var(--space-4); }
 .form-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px var(--space-4); }
 .form-grid .span-2, .form-grid-3 .span-all { grid-column: 1 / -1; }
+
+/* ============================================================
+   概要チップ（ヘッダー直下の1行）
+   ============================================================ */
+.summary-chips {
+    display: flex; gap: 6px; padding: 0 var(--space-4) 8px; margin-top: -2px; flex-shrink: 0;
+    background: var(--surface); overflow-x: auto; scrollbar-width: none;
+}
+.summary-chips::-webkit-scrollbar { display: none; }
+.summary-chips:empty { display: none; }
+/* 概要チップがあるときは、見出しとチップを1つのまとまりとして見せる */
+#assetModal .modal-header { border-bottom: none; }
+.summary-chip {
+    display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+    padding: 2px 8px; border-radius: var(--radius-md); max-width: 340px;
+    background: var(--surface-sunken); border: 1px solid var(--border-subtle);
+    font-family: inherit; font-size: var(--text-xs); color: var(--text); cursor: pointer;
+    white-space: nowrap; transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.summary-chip:hover { border-color: var(--primary-border); background: var(--primary-bg); }
+.summary-chip > i { color: var(--text-faint); font-size: 0.7rem; }
+.summary-chip-label { color: var(--text-sub); }
+.summary-chip-value { overflow: hidden; text-overflow: ellipsis; }
+.summary-chip.is-muted .summary-chip-value { color: var(--text-faint); }
+.summary-chip[data-tone="danger"] { border-color: var(--r-200); background: var(--danger-bg); }
+.summary-chip[data-tone="danger"] > i { color: var(--danger); }
+
+/* 構成（所属先・構成パーツ）を左右に */
+.structure-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-4); }
+.structure-label { margin-bottom: 4px; }
+.component-list { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+.component-row {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px; cursor: pointer;
+    border-bottom: 1px solid var(--border-subtle); background: var(--surface);
+    transition: background var(--dur-fast) var(--ease);
+}
+.component-row:last-child { border-bottom: none; }
+.component-row:hover { background: var(--p-25); }
+.component-name { flex: 1; min-width: 0; font-weight: 600; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.component-empty {
+    padding: 8px 10px; border: 1px dashed var(--border); border-radius: var(--radius-md);
+    font-size: var(--text-xs); color: var(--text-faint);
+}
+
+/* 計画・履歴（予定と実績を左右に並べる） */
+.plan-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); align-items: start; }
+.plan-col { display: grid; gap: var(--space-2); min-width: 0; }
+.plan-col > .section-head { margin-bottom: 0; }
+.plan-form-schedule { grid-template-columns: 136px 86px minmax(0, 1fr) auto; }
+.plan-form-history  { grid-template-columns: 136px minmax(0, 1fr) auto; }
+@media (max-width: 1100px) {
+    .plan-grid { grid-template-columns: 1fr; }
+}
+
+/* 運用・安全（2×2） */
+.ops-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.ops-title { margin-bottom: var(--space-2); font-size: var(--text-base); }
+
+.image-url-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: var(--space-3); align-items: end; }
 
 /* インラインの追加フォーム（履歴・周期計画） */
 .inline-form {

@@ -118,17 +118,17 @@ function getLatestMaintenance(asset) {
 }
 
 /**
- * 次に到来する周期計画を取得（今日以降で最も近いもの）
+ * 次に対応すべき周期計画を取得（期限超過を含め、最も早いもの）
  * @returns {{date:string, event:string, cycle?:number}|null}
  */
 function getNextSchedule(asset) {
     if(!asset.scheduledPlans || asset.scheduledPlans.length === 0) return null;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const future = asset.scheduledPlans
-        .filter(s => s.date && new Date(s.date) >= today)
+    // 実施済みにすると次回日付へ進むため、過去日付のまま残っている計画は「未実施＝期限超過」。
+    // 超過を除くと最も対応が必要なものが一覧から消えてしまうので、含めて最も早いものを返す。
+    const pending = asset.scheduledPlans
+        .filter(s => s.date && !isNaN(new Date(s.date)))
         .sort((a, b) => new Date(a.date) - new Date(b.date));
-    return future[0] || null;
+    return pending[0] || null;
 }
 
 /**
@@ -225,7 +225,7 @@ function autoSaveData() {
 }
 
 /**
- * 自動保存の状態をサイドバー下部に表示する
+ * 自動保存の状態をヘッダー右側に表示する
  * 「保存したはずだが本当に保存されたか」を確かめる操作を不要にするため、
  * 状態を静かに、しかし常に見える場所に出しておく。
  * @param {'saving'|'saved'|'error'} state
@@ -436,6 +436,28 @@ function escapeHTML(str) {
 function getStatusBadgeClass(status) {
     const def = STATUS_DEFS.find(s => s.value === status);
     return def ? def.badge : 'badge-blue';
+}
+
+/**
+ * 資産の状態を表す色（複数ある場合は STATUS_DEFS で後ろ＝深刻なものを優先）
+ * 一覧の行頭ドットなど、文字を読まずに状態を見分けるための色。
+ */
+function getAssetStatusColor(asset) {
+    const status = Array.isArray(asset.status) ? asset.status : [asset.status];
+    const defs = STATUS_DEFS.filter(d => status.includes(d.value) && d.value !== '廃棄');
+    if(defs.length > 0) return defs[defs.length - 1].nodeColor;
+    if(status.includes('廃棄')) return STATUS_DEFS.find(d => d.value === '廃棄').nodeColor;
+    return 'var(--n-300)';
+}
+
+/**
+ * 期限までの日数を色付きのラベルにする（超過=赤 / 7日以内=琥珀 / それ以外=灰）
+ * @param {number} days
+ */
+function renderDuePill(days) {
+    if(isNaN(days)) return '';
+    const tone = days < 0 ? 'danger' : days <= 7 ? 'warning' : 'neutral';
+    return `<span class="due-pill" data-tone="${tone}">${escapeHTML(formatDayDelta(days))}</span>`;
 }
 
 /**
