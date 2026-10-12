@@ -150,7 +150,12 @@ function describeActiveFilters() {
 function handleSearch(query) {
     searchQuery = query || '';
     updateSearchInputState();
-    applyFilters();
+    // 入力中は一覧の絞り込みに専念し、候補で一覧を隠さない（候補は ↓ で開く）
+    if(searchQuery.trim()) closeSearchSuggest();
+    else if(document.activeElement?.id === 'searchInput') openSearchSuggest();
+    // ダッシュボードで入力したら、資産一覧へ移って絞り込む
+    if(currentPage !== 'assets') showAssets({ keepFilter: true });
+    else applyFilters();
 }
 
 function clearSearchInput() {
@@ -193,14 +198,14 @@ function filterGrid(tagId) {
         filterState.tags[tag.masterId] = tagId;
         recordUsage('tags', tagId); // よく使う絞り込みの学習
     }
-    closeFilterPopover();
+    returnFromFilterPopover();
     showFilteredAssets();
 }
 
 /** マスタ1つ分の条件を外す */
 function clearMasterFilter(masterId) {
     delete filterState.tags[masterId];
-    closeFilterPopover();
+    returnFromFilterPopover();
     showFilteredAssets();
 }
 

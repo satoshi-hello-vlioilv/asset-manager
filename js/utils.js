@@ -450,6 +450,45 @@ function getAssetStatusColor(asset) {
     return 'var(--n-300)';
 }
 
+/** 資産の状態の意味（STATUS_DEFS の level）を集める */
+function getStatusLevels(asset) {
+    const status = Array.isArray(asset.status) ? asset.status : [asset.status];
+    return STATUS_DEFS.filter(d => status.includes(d.value)).map(d => d.level);
+}
+
+/** 正常（ok）以外の状態名。一覧では、これだけを名称の後ろにバッジで出す */
+function getExceptionStatuses(asset) {
+    const status = Array.isArray(asset.status) ? asset.status : [asset.status];
+    return status.filter(s => s && STATUS_DEFS.find(d => d.value === s)?.level !== 'ok');
+}
+
+/**
+ * 「対応が必要な順」の並び順キー（小さいほど上）
+ *   0 停止中 → 1 期限超過（超過日数の多い順）→ 2 点検・修理中 → 3 14日以内の予定
+ *   → 4 その他（予定が近い順）→ 5 対象外（廃棄）
+ * @returns {[number, number]}
+ */
+function getUrgencyKey(asset) {
+    const levels = getStatusLevels(asset);
+    const next = getNextSchedule(asset);
+    const days = next ? daysUntil(next.date) : NaN;
+    const d = isNaN(days) ? 99999 : days;
+    if(levels.includes('off') && !levels.includes('stop') && !levels.includes('warn')) return [5, d];
+    if(levels.includes('stop')) return [0, d];
+    if(d < 0) return [1, d];
+    if(levels.includes('warn')) return [2, d];
+    if(d <= 14) return [3, d];
+    return [4, d];
+}
+
+/** 対応が必要な順に並べた新しい配列を返す（同順位は元の順を保つ） */
+function sortByUrgency(list) {
+    return list
+        .map((a, i) => ({ a, i, k: getUrgencyKey(a) }))
+        .sort((x, y) => x.k[0] - y.k[0] || x.k[1] - y.k[1] || x.i - y.i)
+        .map(x => x.a);
+}
+
 /**
  * 期限までの日数を色付きのラベルにする（超過=赤 / 7日以内=琥珀 / それ以外=灰）
  * @param {number} days

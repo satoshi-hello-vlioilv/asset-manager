@@ -66,6 +66,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupGlobalDropZone();     // JSON / 画像のグローバルドラッグ&ドロップ
     setupImagePasteHandler();  // Ctrl+V での画像貼り付け
     setupPaletteEvents();      // コマンドパレット
+    setupSearchEvents();       // ヘッダー検索欄（候補のドロップダウン）
 });
 
 /**
@@ -162,6 +163,7 @@ function setupGlobalEvents() {
         if(e.key === 'Escape') {
             if(isLightboxOpen()) { closeLightbox(); return; }
             if(isPaletteOpen())  { closePalette();  return; }
+            if(isSearchSuggestOpen()) { closeSearchSuggest(); return; }
             if(document.querySelector('.menu.open')) { closeMenus(); return; }
             if(isFilterPopoverOpen()) { closeFilterPopover(); return; }
 
@@ -183,10 +185,12 @@ function setupGlobalEvents() {
             if(e.key === 'ArrowRight') { e.preventDefault(); stepAsset(1);  return; }
         }
 
-        /* Ctrl/⌘ + K: コマンドパレット（どこからでも） */
+        /* Ctrl/⌘ + K: ヘッダーの検索欄で資産・タグ・操作を探す（どこからでも） */
         if(modKey && e.key.toLowerCase() === 'k') {
             e.preventDefault();
-            isPaletteOpen() ? closePalette() : openPalette();
+            if(isPaletteOpen()) closePalette();
+            else if(isSearchSuggestOpen()) { closeSearchSuggest(); document.getElementById('searchInput').blur(); }
+            else focusSearch();
             return;
         }
 
@@ -249,11 +253,22 @@ function setupGlobalEvents() {
     /* --- メニュー・絞り込みポップオーバーは外側クリックで閉じる --- */
     document.addEventListener('click', (e) => {
         if(!e.target.closest('.menu-wrap')) closeMenus();
-        if(isFilterPopoverOpen() && !e.target.closest('#filterPopover, .filter-btn')) closeFilterPopover();
+        // クリック中に中身が描き直されても判定できるよう、発生時点の経路で調べる
+        const inside = e.composedPath().some(el => el instanceof Element &&
+            (el.id === 'filterPopover' || el.classList.contains('filter-btn') || el.id === 'filterSheetBtn' || el.id === 'filterChips'));
+        if(isFilterPopoverOpen() && !inside) closeFilterPopover();
     });
-    // 位置がずれたポップオーバーは残さない
-    window.addEventListener('resize', closeFilterPopover);
-    document.querySelector('.content-scroll').addEventListener('scroll', closeFilterPopover, { passive: true });
+    // 位置がずれたポップオーバーは残さない（下端固定のシートはずれないので、キーボード表示で閉じないよう除外）
+    window.addEventListener('resize', () => { if(!filterSheetActive) closeFilterPopover(); });
+    // ダッシュボードの要対応は画面の高さに合わせて表示件数を決めるため、変わったときだけ描き直す
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            if(currentPage === 'dashboard' && computeActionGroupPreview() !== actionGroupPreview) renderDashboard();
+        }, 200);
+    });
+    document.querySelector('.content-scroll').addEventListener('scroll', () => { if(!filterSheetActive) closeFilterPopover(); }, { passive: true });
 
     /* --- グラフのホイールズーム --- */
     const graphView = document.getElementById('graphView');

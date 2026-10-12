@@ -16,8 +16,16 @@
 let paletteState = {
     items: [],       // 表示中の候補（フラット配列）
     activeIndex: 0,
-    open: false
+    open: false,
+    host: 'modal'    // 候補の表示先: 'modal'（パレット） / 'inline'（ヘッダー検索欄のドロップダウン）
 };
+
+/*
+ * v3.1: 検索の入口をヘッダーの検索欄1つに統合した。
+ *   - 入力すると表示中の一覧を絞り込む（候補で一覧を隠さない）
+ *   - 空欄でフォーカス／↓キー／Ctrl+K で、資産・タグ・操作の候補をドロップダウンで開く
+ *   - モーダル表示中など、ヘッダーの検索欄が見えない場面ではパレット（モーダル）で代用する
+ */
 
 /* パレットから実行できる操作 */
 function getPaletteCommands() {
@@ -119,6 +127,7 @@ function buildPaletteGroups(query) {
                     title: highlight(t.name, q),
                     sub: master ? master.name : '',
                     right: `<span class="count-pill">${count}</span>`,
+                    clearsQuery: true, // タグを選んだら、入力していた語での絞り込みは外す
                     run: () => { showAssets({ keepFilter: true }); filterGrid(t.id, null); }
                 };
             })
@@ -168,8 +177,15 @@ function highlight(text, q) {
          + escapeHTML(text.slice(idx + q.length));
 }
 
+/** 候補を描く先の要素 */
+function getPaletteContainer() {
+    return paletteState.host === 'inline'
+        ? document.getElementById('searchSuggestList')
+        : document.getElementById('paletteResults');
+}
+
 function renderPaletteResults(query) {
-    const container = document.getElementById('paletteResults');
+    const container = getPaletteContainer();
     if(!container) return;
 
     const groups = buildPaletteGroups(query);
@@ -219,7 +235,9 @@ function movePaletteActive(delta) {
 }
 
 function updatePaletteActiveClass(scroll = false) {
-    document.querySelectorAll('.palette-item').forEach(el => {
+    const container = getPaletteContainer();
+    if(!container) return;
+    container.querySelectorAll('.palette-item').forEach(el => {
         const isActive = Number(el.dataset.index) === paletteState.activeIndex;
         el.classList.toggle('active', isActive);
         if(isActive && scroll) el.scrollIntoView({ block: 'nearest' });
@@ -230,8 +248,93 @@ function runPaletteItem(index) {
     const item = paletteState.items[index];
     if(!item) return;
     if(item.commandId) recordUsage('commands', item.commandId);
+    const fromInline = paletteState.host === 'inline';
     closePalette();
+    closeSearchSuggest();
+    if(fromInline) {
+        if(item.clearsQuery) resetSearchQuery();
+        document.getElementById('searchInput')?.blur();
+    }
     item.run();
+}
+
+/* ============================================================
+   ヘッダー検索欄の候補（ドロップダウン）
+   ============================================================ */
+
+function isSearchSuggestOpen() {
+    return paletteState.host === 'inline' && document.getElementById('searchSuggest')?.classList.contains('open');
+}
+
+/** 検索欄の下に候補を開く（入力中の語で候補を出す） */
+function openSearchSuggest() {
+    const box = document.getElementById('searchSuggest');
+    const input = document.getElementById('searchInput');
+    if(!box || !input) return;
+    closePalette();
+    closeMenus();
+    paletteState.host = 'inline';
+    const q = input.value.trim();
+    box.innerHTML = `
+        <div class="search-suggest-list" id="searchSuggestList"></div>
+        <div class="palette-footer">
+            <span>${q ? `一覧は「${escapeHTML(q)}」で絞り込み中` : '入力すると表示中の一覧を絞り込みます'}</span>
+            <span><span class="kbd">↑</span><span class="kbd">↓</span> 選ぶ</span>
+            <span><span class="kbd">Enter</span> 開く</span>
+            <span><span class="kbd">Esc</span> 閉じる</span>
+        </div>`;
+    box.classList.add('open');
+    input.setAttribute('aria-expanded', 'true');
+    renderPaletteResults(q);
+}
+
+function closeSearchSuggest() {
+    const box = document.getElementById('searchSuggest');
+    if(!box || !box.classList.contains('open')) return;
+    box.classList.remove('open');
+    box.innerHTML = '';
+    document.getElementById('searchInput')?.setAttribute('aria-expanded', 'false');
+    if(paletteState.host === 'inline') paletteState.host = 'modal';
+}
+
+/**
+ * 検索欄にフォーカスして候補を開く（Ctrl+K）
+ * モーダル表示中は検索欄が隠れているため、パレットで代用する。
+ */
+function focusSearch() {
+    const input = document.getElementById('searchInput');
+    if(!input || input.offsetParent === null || getTopModalId()) { openPalette(); return; }
+    input.focus();
+    input.select();
+    openSearchSuggest();
+}
+
+/** ヘッダー検索欄のキー操作 */
+function setupSearchEvents() {
+    const input = document.getElementById('searchInput');
+    if(!input) return;
+
+    // 空欄でフォーカスしたときは、直前の作業の続き（最近開いた資産・よく使う操作）を出す
+    input.addEventListener('focus', () => { if(!input.value.trim()) openSearchSuggest(); });
+    // フォーカス中にもう一度押したら、入力中の語で候補を開く（キーボードの無い端末向け）
+    input.addEventListener('click', () => { if(document.activeElement === input && !isSearchSuggestOpen()) openSearchSuggest(); });
+    input.addEventListener('blur', closeSearchSuggest);
+
+    input.addEventListener('keydown', (e) => {
+        if(e.isComposing) return; // 日本語入力の変換中は無視
+        const open = isSearchSuggestOpen();
+        if(e.key === 'ArrowDown') {
+            e.preventDefault();
+            open ? movePaletteActive(1) : openSearchSuggest();
+        } else if(e.key === 'ArrowUp' && open) {
+            e.preventDefault(); movePaletteActive(-1);
+        } else if(e.key === 'Enter' && open) {
+            e.preventDefault(); runPaletteItem(paletteState.activeIndex);
+        } else if(e.key === 'Escape') {
+            e.preventDefault(); e.stopPropagation();
+            if(open) closeSearchSuggest(); else input.blur();
+        }
+    });
 }
 
 /**

@@ -31,10 +31,18 @@ function switchAssetView(mode, options = {}) {
  * （モーダルの「前へ / 次へ」と ↑↓ の行移動が、見えている順番と一致するようにする）
  */
 function getDisplayedAssets() {
-    const list = getFilteredAssets();
+    return orderAssetsForDisplay(getFilteredAssets());
+}
+
+/**
+ * 表示順に並べる
+ * 列の見出しで並べ替えていなければ「対応が必要な順」（停止中・期限超過が上、廃棄は末尾）。
+ * 一覧を開いてすぐ、手を打つべきものが目に入るようにする。
+ */
+function orderAssetsForDisplay(list) {
     return (listSortState.key && listSortState.direction)
         ? sortAssetList(list, listSortState.key, listSortState.direction)
-        : list;
+        : sortByUrgency(list);
 }
 
 /**
@@ -113,16 +121,14 @@ function renderAssetsList(list) {
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
-    // ソート適用
-    let displayList = list;
-    if(listSortState.key && listSortState.direction) {
-        displayList = sortAssetList(list, listSortState.key, listSortState.direction);
-    }
+    const displayList = orderAssetsForDisplay(list);
 
     const tbody = document.createElement('tbody');
     displayList.forEach(asset => {
         const row = document.createElement('tr');
         row.dataset.assetId = asset.id;
+        // 対象外（廃棄）の行は淡く表示する（並びも末尾）
+        if(getUrgencyKey(asset)[0] === 5) row.classList.add('is-retired');
         row.onclick = () => openAssetModal(asset.id);
         row.onmouseenter = () => setListCursor(asset.id, { scroll: false });
 
@@ -287,13 +293,17 @@ function getAssetFieldValue(asset, key, textOnly = false) {
     };
 
     switch(key) {
-        case 'name':
+        case 'name': {
             if(textOnly) return asset.name;
-            // 行頭の色ドットで状態を示す（ステータス列まで視線を動かさずに異常に気づける）
+            // 行頭の色ドットで状態を示し、正常以外（点検・修理・停止・廃棄）は名称の後ろに文字でも出す。
+            // 正常な行は静かに、例外だけが目に留まる（状態をステータス列と二重に出さない）
+            const exceptions = getExceptionStatuses(asset);
             return `<span class="cell-name-wrap">
                 <span class="status-dot" style="background:${getAssetStatusColor(asset)};" title="${escapeHTML(statusArray.filter(Boolean).join('・') || '未設定')}"></span>
                 <span class="cell-name">${escapeHTML(asset.name)}</span>
+                ${exceptions.length ? `<span class="cell-status">${renderStatusBadgesHTML(exceptions)}</span>` : ''}
             </span>`;
+        }
 
         case 'id':
             if(textOnly) return asset.id.toUpperCase();
@@ -424,7 +434,7 @@ function renderAssetsCard(list) {
     const grid = document.createElement('div');
     grid.className = 'asset-grid';
 
-    list.forEach(a => {
+    orderAssetsForDisplay(list).forEach(a => {
         const card = document.createElement('div');
         card.className = 'card';
         card.tabIndex = 0;

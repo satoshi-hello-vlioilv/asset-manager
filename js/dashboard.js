@@ -10,8 +10,10 @@
  *     2段目左: 要対応（停止中 / 期限超過 / 14日以内 の3グループ、各上位3件）
  *     2段目右: 稼働状況の内訳・最近の動き（文脈の確認）
  *
- *   要対応は件数が増えても画面を占領しないよう、種別ごとに上位3件だけを出し、
+ *   要対応は件数が増えても画面を占領しないよう、種別ごとに上位だけを出し、
  *   残りは「すべて表示」で開く（サブ情報はコンパクトに、全体像は崩さない）。
+ *   v3.1: 同じ資産の課題は1行にまとめ（「ほか n件」）、1台が上位を占有しないようにした。
+ *   上位の件数は固定の3件ではなく、画面の高さに収まるだけ出す（下に空白を残さない）。
  *   各行の「実施済み」で、点検 → 履歴に記録 → 次回予定を更新 を1クリックで完了できる。
  */
 
@@ -21,7 +23,32 @@ const actionGroupState = {
     over: { collapsed: false, expanded: false },
     soon: { collapsed: false, expanded: false }
 };
-const ACTION_GROUP_PREVIEW = 3;
+/* 各グループで最初に見せる行数の下限・上限（実際は画面の高さから決める） */
+const ACTION_GROUP_PREVIEW_MIN = 3;
+const ACTION_GROUP_PREVIEW_MAX = 8;
+let actionGroupPreview = ACTION_GROUP_PREVIEW_MIN;
+
+/**
+ * 画面の高さに収まる、グループあたりの行数
+ * ヘッダー・KPIストリップ・各グループの見出しと「残りを表示」の高さを差し引き、
+ * 3グループで等分する。狭い画面（1列表示）では要対応の下に他のパネルが続くため下限にする。
+ */
+function computeActionGroupPreview() {
+    if(window.innerWidth <= 1100) return ACTION_GROUP_PREVIEW_MIN;
+    const ROW = 33, GROUP_CHROME = 58, PAGE_CHROME = 214; // 行 / 見出し+残り表示 / ヘッダー・KPI・パネル見出し・余白（px）
+    const perGroup = Math.floor((window.innerHeight - PAGE_CHROME - GROUP_CHROME * 3) / 3 / ROW);
+    return Math.max(ACTION_GROUP_PREVIEW_MIN, Math.min(ACTION_GROUP_PREVIEW_MAX, perGroup));
+}
+
+/** 同じ資産の課題を1行にまとめる（最も急ぐものを代表にし、残りは more に持つ） */
+function mergeActionItemsByAsset(list) {
+    const byAsset = new Map();
+    list.forEach(item => {
+        if(byAsset.has(item.assetId)) byAsset.get(item.assetId).more.push(item);
+        else byAsset.set(item.assetId, { ...item, more: [] });
+    });
+    return [...byAsset.values()];
+}
 
 function renderDashboard() {
     const container = document.getElementById('dashboardContainer');
@@ -45,6 +72,7 @@ function renderDashboard() {
 
     const tasks = collectActionItems();
     const groups = groupActionItems(tasks);
+    actionGroupPreview = computeActionGroupPreview();
 
     // 稼働状況の比率をKPI内のミニバーで示す（数字と割合を同じ場所で読める）
     const mix = STATUS_DEFS
@@ -198,7 +226,10 @@ function renderActionCenter(items, groups) {
     ];
 
     const row = (item) => {
-        const index = items.indexOf(item);
+        // 「実施済み」は代表の課題に対して行う（collectActionItems の並びでの位置）
+        const index = items.findIndex(i => i.assetId === item.assetId && i.kind === item.kind
+            && i.planIndex === item.planIndex && i.desc === item.desc);
+        const more = item.more || [];
         return `
             <div class="action-row" onclick="openAssetModal('${item.assetId}')" title="クリックして詳細を開く">
                 <span class="action-mark" data-tone="${item.tone}"></span>
@@ -206,6 +237,7 @@ function renderActionCenter(items, groups) {
                 <div class="action-main">
                     <span class="action-title">${escapeHTML(item.title)}</span>
                     <span class="action-desc">${escapeHTML(item.desc)}</span>
+                    ${more.length ? `<span class="action-more-count" title="${escapeHTML(more.map(m => `${m.desc}　${m.when}`).join('\n'))}">ほか${more.length}件</span>` : ''}
                 </div>
                 <span class="action-when" data-tone="${item.tone}">${escapeHTML(item.when)}</span>
                 <span class="action-quick">${item.kind === 'schedule' ? `
@@ -218,9 +250,9 @@ function renderActionCenter(items, groups) {
     };
 
     const section = (def) => {
-        const list = groups[def.key];
+        const list = mergeActionItemsByAsset(groups[def.key]);
         const state = actionGroupState[def.key];
-        const shown = state.expanded ? list : list.slice(0, ACTION_GROUP_PREVIEW);
+        const shown = state.expanded ? list : list.slice(0, actionGroupPreview);
         const rest = list.length - shown.length;
         return `
             <div class="action-group ${state.collapsed ? 'is-collapsed' : ''}" id="actionGroup-${def.key}">
@@ -228,7 +260,8 @@ function renderActionCenter(items, groups) {
                     <i class="fa-solid fa-chevron-down action-group-chevron"></i>
                     <span class="action-group-dot" data-tone="${list.length ? def.tone : 'neutral'}"></span>
                     <span class="action-group-title">${def.label}</span>
-                    <span class="count-pill">${list.length}</span>
+                    <span class="count-pill">${groups[def.key].length}</span>
+                    ${list.length ? `<span class="action-group-unit">資産 ${list.length}台</span>` : ''}
                 </button>
                 <div class="action-group-body">
                     ${list.length === 0
@@ -238,9 +271,9 @@ function renderActionCenter(items, groups) {
                         <button class="action-more" onclick="expandActionGroup('${def.key}', true)">
                             残り ${rest} 件を表示 <i class="fa-solid fa-chevron-down"></i>
                         </button>` : ''}
-                    ${state.expanded && list.length > ACTION_GROUP_PREVIEW ? `
+                    ${state.expanded && list.length > actionGroupPreview ? `
                         <button class="action-more" onclick="expandActionGroup('${def.key}', false)">
-                            上位 ${ACTION_GROUP_PREVIEW} 件に戻す <i class="fa-solid fa-chevron-up"></i>
+                            上位 ${actionGroupPreview} 件に戻す <i class="fa-solid fa-chevron-up"></i>
                         </button>` : ''}
                 </div>
             </div>`;

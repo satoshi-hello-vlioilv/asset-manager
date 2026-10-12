@@ -83,7 +83,7 @@ function setHeaderMode(mode) {
         const el = document.getElementById(id);
         if(el) el.style.display = display;
     };
-    show('searchContainer', isAssets ? 'block' : 'none');
+    // 検索欄はどの画面でも出す（検索の入口を1つにまとめたため）
     show('viewToggle',      isAssets ? 'inline-flex' : 'none');
     show('btnListSettings', isAssets && assetViewMode === 'list' ? 'inline-flex' : 'none');
     document.getElementById('filterBar').classList.toggle('show', isAssets);
@@ -170,6 +170,63 @@ function renderFilterBar(visibleCount) {
 
     const conditions = (filterState.status ? 1 : 0) + Object.keys(filterState.tags).length + (hasQuery ? 1 : 0);
     document.getElementById('filterClear').style.display = conditions > 1 ? 'inline-flex' : 'none';
+
+    /* --- 狭い画面用: 「絞り込み」ボタンと、適用中のタグ条件のチップ ---
+       マスタ別のボタンを横に並べると画面外に隠れるため、1つの入口にまとめ、
+       何で絞り込んでいるかはチップで常に見せる（記憶させない） */
+    const filterCount = (filterState.status ? 1 : 0) + getFilterTagIds().length;
+    const sheetBtn = document.getElementById('filterSheetBtn');
+    if(sheetBtn) {
+        sheetBtn.classList.toggle('is-active', filterCount > 0);
+        sheetBtn.innerHTML = `<i class="fa-solid fa-sliders"></i>絞り込み${filterCount > 0 ? `<span class="count-pill">${filterCount}</span>` : ''}`;
+    }
+    const chips = document.getElementById('filterChips');
+    if(chips) {
+        chips.innerHTML = getFilterTagIds().map(id => {
+            const tag = tags.find(t => t.id === id);
+            const master = masters.find(m => m.id === tag.masterId);
+            return `
+                <span class="chip">
+                    <span class="chip-label" onclick="openFilterPopover('${escapeHTML(tag.masterId)}', null, { fromSheet: true })">
+                        <span class="chip-kind">${escapeHTML(master ? master.name : '')}</span> ${escapeHTML(tag.name)}
+                    </span>
+                    <button class="chip-remove" onclick="event.stopPropagation(); clearMasterFilter('${escapeHTML(tag.masterId)}')"
+                            title="この条件を外す" aria-label="${escapeHTML(master ? master.name : '')} の条件を外す">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </span>`;
+        }).join('');
+    }
+    renderSortIndicator();
+    if(filterPopoverMasterId === FILTER_SHEET_HOME) renderFilterSheetHome();
+}
+
+/**
+ * 並び順の表示
+ * 既定の「対応が必要な順」は何順なのかが見えないと、並びに意味があると気づけないため明示する。
+ */
+function renderSortIndicator() {
+    const el = document.getElementById('sortIndicator');
+    if(!el) return;
+    if(assetViewMode === 'calendar') { el.innerHTML = ''; return; }
+    const sorted = listSortState.key && listSortState.direction;
+    if(!sorted) {
+        el.innerHTML = `
+            <span class="sort-indicator-label" title="停止中 → 期限超過 → 点検・修理中 → 14日以内の予定 → その他 → 廃棄 の順。列の見出しを押すと並べ替えられます">
+                <i class="fa-solid fa-arrow-down-wide-short"></i><span class="hide-sm">並び:</span> 対応が必要な順
+            </span>`;
+        return;
+    }
+    const col = listDisplaySettings.columns.find(c => c.key === listSortState.key);
+    el.innerHTML = `
+        <span class="chip">
+            <span class="chip-label"><span class="chip-kind hide-sm">並び</span> ${escapeHTML(col ? col.label : listSortState.key)}
+                <i class="fa-solid fa-arrow-${listSortState.direction === 'asc' ? 'up' : 'down'}" style="font-size:0.6rem;"></i></span>
+            <button class="chip-remove" onclick="resetListSortState(); applyFilters();"
+                    title="「対応が必要な順」に戻す" aria-label="並び順を「対応が必要な順」に戻す">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </span>`;
 }
 
 /* ============================================================
@@ -179,12 +236,89 @@ function renderFilterBar(visibleCount) {
 let filterPopoverMasterId = null;
 /* ポップオーバー内で展開しているタグ（開閉状態を描き直しても保つ） */
 const filterPopoverOpen = new Set();
+/* 狭い画面の絞り込みシート（下から出る）の最初の画面を表す ID */
+const FILTER_SHEET_HOME = '__sheet__';
+/* 絞り込みシートから開いているか（タグを選んだあとシートの最初の画面へ戻る） */
+let filterSheetActive = false;
+
+/** 狭い画面では、絞り込みをポップオーバーではなく下からのシートで出す */
+function isFilterSheetMode() {
+    return window.innerWidth <= 640;
+}
 
 function closeFilterPopover() {
     const pop = document.getElementById('filterPopover');
-    if(pop) pop.classList.remove('open');
+    if(pop) pop.classList.remove('open', 'is-sheet');
+    const backdrop = document.getElementById('filterSheetBackdrop');
+    if(backdrop) backdrop.classList.remove('show');
     document.querySelectorAll('.filter-btn.is-open').forEach(b => b.classList.remove('is-open'));
     filterPopoverMasterId = null;
+    filterSheetActive = false;
+}
+
+/** 絞り込みシートを開いている場合はその最初の画面へ戻り、そうでなければ閉じる */
+function returnFromFilterPopover() {
+    if(filterSheetActive && isFilterSheetMode()) openFilterSheet();
+    else closeFilterPopover();
+}
+
+/** シート表示に切り替える（背景を暗くし、画面下端に固定） */
+function presentAsSheet(pop) {
+    pop.classList.add('open', 'is-sheet');
+    document.getElementById('filterSheetBackdrop').classList.add('show');
+    filterSheetActive = true;
+}
+
+/**
+ * 狭い画面用の絞り込みシートを開く
+ * 稼働状況と、マスタごとの現在の条件を1画面にまとめる。マスタを選ぶとタグ階層ツリーへ進む。
+ */
+function openFilterSheet() {
+    closeMenus();
+    const pop = document.getElementById('filterPopover');
+    document.querySelectorAll('.filter-btn.is-open').forEach(b => b.classList.remove('is-open'));
+    filterPopoverMasterId = FILTER_SHEET_HOME;
+    presentAsSheet(pop);
+    renderFilterSheetHome();
+}
+
+function renderFilterSheetHome() {
+    const pop = document.getElementById('filterPopover');
+    if(!pop) return;
+    const visible = getFilteredAssets().length;
+    const current = filterState.status || '__all__';
+    const statusHTML = getStatusFilterOptions().map(o => `
+        <button class="status-seg-item ${current === o.value ? 'active' : ''}"
+                onclick="filterByStatus('${escapeHTML(o.value)}', { keepTags: true })"
+                ${o.count === 0 && current !== o.value ? 'data-empty="true"' : ''}>
+            <i class="status-seg-dot" style="background:${o.color};"></i>${escapeHTML(o.label)}<span class="status-seg-count">${o.count}</span>
+        </button>`).join('');
+    const masterHTML = masters.map(m => {
+        const tagId = filterState.tags[m.id];
+        const tag = tagId !== undefined ? tags.find(t => t.id === tagId) : null;
+        return `
+            <button class="filter-sheet-row ${tag ? 'is-active' : ''}" onclick="openFilterPopover('${escapeHTML(m.id)}', null, { fromSheet: true })">
+                <span class="filter-sheet-row-name">${escapeHTML(m.name)}</span>
+                <span class="filter-sheet-row-value">${tag ? escapeHTML(tag.name) : 'すべて'}</span>
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>`;
+    }).join('');
+    pop.innerHTML = `
+        <div class="filter-sheet-head">
+            <span class="filter-sheet-title">絞り込み</span>
+            <button class="btn btn-ghost btn-sm" onclick="clearAssetFilter()" ${hasActiveFilters() ? '' : 'disabled'}>
+                <i class="fa-solid fa-rotate-left"></i> 条件を解除
+            </button>
+        </div>
+        <div class="filter-pop-body">
+            <div class="filter-pop-label">稼働状況</div>
+            <div class="status-seg filter-sheet-status" role="group" aria-label="稼働状況で絞り込む">${statusHTML}</div>
+            <div class="filter-pop-label">タグ</div>
+            ${masterHTML}
+        </div>
+        <div class="filter-sheet-foot">
+            <button class="btn btn-primary" onclick="closeFilterPopover()">${visible} 件を表示</button>
+        </div>`;
 }
 
 function isFilterPopoverOpen() {
@@ -196,12 +330,13 @@ function isFilterPopoverOpen() {
  * @param {string} masterId
  * @param {HTMLElement} anchor - 位置合わせの基準にするボタン
  */
-function openFilterPopover(masterId, anchor) {
-    if(filterPopoverMasterId === masterId) { closeFilterPopover(); return; }
+function openFilterPopover(masterId, anchor, options = {}) {
+    const asSheet = isFilterSheetMode() && (options.fromSheet || !anchor);
+    if(filterPopoverMasterId === masterId && !asSheet) { closeFilterPopover(); return; }
     closeMenus();
     closeFilterPopover();
     filterPopoverMasterId = masterId;
-    anchor.classList.add('is-open');
+    if(anchor) anchor.classList.add('is-open');
 
     // 選択中のタグまでの枝を開いておく（今どこにいるかが見える）
     const activeId = filterState.tags[masterId];
@@ -217,6 +352,13 @@ function openFilterPopover(masterId, anchor) {
     const pop = document.getElementById('filterPopover');
     const master = masters.find(m => m.id === masterId);
     pop.innerHTML = `
+        ${asSheet ? `
+            <div class="filter-sheet-head">
+                <button class="btn btn-ghost btn-sm" onclick="openFilterSheet()">
+                    <i class="fa-solid fa-chevron-left"></i> 絞り込み
+                </button>
+                <span class="filter-sheet-title">${escapeHTML(master ? master.name : '')}</span>
+            </div>` : ''}
         <div class="filter-pop-head">
             <i class="fa-solid fa-magnifying-glass"></i>
             <input type="text" class="filter-pop-search" id="filterPopSearch"
@@ -230,9 +372,14 @@ function openFilterPopover(masterId, anchor) {
                     <i class="fa-solid fa-xmark"></i> この条件を外す
                 </button>
             </div>` : ''}`;
-    pop.classList.add('open');
-    renderFilterPopoverBody();
-    positionFilterPopover(anchor);
+    if(asSheet) {
+        presentAsSheet(pop);
+        renderFilterPopoverBody();
+    } else {
+        pop.classList.add('open');
+        renderFilterPopoverBody();
+        positionFilterPopover(anchor);
+    }
 
     const input = document.getElementById('filterPopSearch');
     if(input && window.innerWidth > 640) input.focus();

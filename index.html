@@ -49,24 +49,22 @@
 
             <!-- 絞り込み・表示に関する道具（狭い画面では2段目に回り込む） -->
             <div class="header-tools">
-                <!-- 検索（資産一覧でのみ表示） -->
-                <div class="search-container" id="searchContainer" style="display:none;">
+                <!-- 検索（入口はこの1つ）
+                     入力すると表示中の一覧を絞り込む。空欄でフォーカス／↓キー／Ctrl+K で
+                     資産・タグ・操作の候補を開く（以前の「検索 Ctrl K」ボタンと統合） -->
+                <div class="search-container" id="searchContainer">
                     <i class="fa-solid fa-magnifying-glass search-icon"></i>
                     <input type="text" class="search-input" id="searchInput"
-                           placeholder="この一覧の中を絞り込む…" aria-label="表示中の資産を絞り込む"
+                           placeholder="資産・タグを検索、一覧を絞り込む" aria-label="資産・タグを検索、一覧を絞り込む"
+                           aria-controls="searchSuggest" aria-autocomplete="list" autocomplete="off" spellcheck="false"
                            oninput="handleSearch(this.value)">
-                    <span class="search-hint hide-md"><span class="kbd">/</span></span>
+                    <span class="search-hint hide-md"><span class="kbd">/</span><span class="kbd">Ctrl K</span></span>
                     <button class="search-clear" onclick="clearSearchInput()" title="検索をクリア" aria-label="検索をクリア">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
+                    <div class="search-suggest" id="searchSuggest" role="listbox" aria-label="検索候補"
+                         onmousedown="event.preventDefault()"></div>
                 </div>
-
-                <!-- 全体検索（コマンドパレット） -->
-                <button class="btn btn-outline btn-sm" onclick="openPalette()" title="資産・タグ・操作を横断検索 (Ctrl+K)">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <span class="hide-sm">検索</span>
-                    <span class="kbd hide-md">Ctrl K</span>
-                </button>
 
                 <!-- 表示切替（資産一覧でのみ表示） -->
                 <div class="segmented" id="viewToggle" style="display:none;" role="group" aria-label="表示形式">
@@ -151,7 +149,7 @@
 
                 <!-- 主要動線：1画面に1つだけの primary -->
                 <button class="btn btn-primary btn-sm" onclick="createNewAsset()" id="btnCreateAsset" title="新しい資産を登録します (N)">
-                    <i class="fa-solid fa-plus"></i> <span class="hide-sm">新規資産</span>
+                    <i class="fa-solid fa-plus"></i> <span class="hide-sm">新規資産</span><span class="show-sm">新規</span>
                     <span class="kbd kbd-on-primary hide-md">N</span>
                 </button>
             </div>
@@ -162,12 +160,17 @@
              稼働状況・マスタごとの条件・件数を常時提示する（資産一覧のみ）
              ============================================= -->
         <div class="filter-bar" id="filterBar">
+            <!-- 狭い画面: マスタ別ボタンの代わりに「絞り込み」1つ + 適用中の条件チップ -->
+            <button class="filter-sheet-btn" id="filterSheetBtn" onclick="openFilterSheet()" aria-haspopup="dialog"></button>
+            <span class="filter-chips" id="filterChips"></span>
             <div class="status-seg" id="filterStatus" role="group" aria-label="稼働状況で絞り込む"></div>
             <div class="filter-masters" id="filterMasters"></div>
             <span id="filterQueryChip"></span>
             <button class="btn btn-ghost btn-sm" id="filterClear" onclick="clearAllFilters()" style="display:none;">
                 <i class="fa-solid fa-rotate-left"></i> すべて解除
             </button>
+            <!-- 並び順（既定は「対応が必要な順」。列の見出しで並べ替えたら、ここから戻せる） -->
+            <span class="sort-indicator" id="sortIndicator"></span>
             <span class="filter-count" id="filterCount"></span>
         </div>
 
@@ -185,6 +188,7 @@
 
 <!-- マスタ別の絞り込み（タグ階層ツリー） -->
 <div class="filter-popover" id="filterPopover" role="dialog" aria-label="タグで絞り込む"></div>
+<div class="filter-sheet-backdrop" id="filterSheetBackdrop"></div>
 
 <!-- =============================================
      COMMAND PALETTE (Ctrl+K)

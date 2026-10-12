@@ -6,7 +6,7 @@
 
 // アプリケーションバージョン（セマンティックバージョニング）
 // 「その他の操作（⋮）」メニュー下部とロゴのツールチップに表示される。更新時はここを変更するだけでよい。
-const APP_VERSION = '3.0.0';
+const APP_VERSION = '3.1.0';
 
 // データ形式のバージョン（DBとバックアップZIPの互換性判定に使う）
 // 3.0 から画像を images ストアに分離し、バックアップはZIP形式になった。
@@ -106,12 +106,15 @@ const FIELD_TYPES = {
 // ここに1行追加するだけで、資産編集画面のチェックボックス・一覧のバッジ色・
 // 資産構成グラフのノード色に自動反映されます（定義順 = グラフ色分けの優先順）
 // nodeColor は css/base.css の状態色トークンと同じ値を使う（画面全体で同じ意味・同じ色）
+// level は状態の意味（一覧の並び順と表示の強さに使う）
+//   ok = 正常（一覧では行頭の色ドットだけ） / warn = 注意 / stop = 停止・要対応
+//   （warn・stop は名称の後ろにバッジでも示す） / off = 対象外（一覧の末尾に淡く表示）
 const STATUS_DEFS = [
-    { value: '稼働中', badge: 'badge-green',  nodeColor: '#1c7a4c' }, // 正常
-    { value: '点検中', badge: 'badge-orange', nodeColor: '#c98a12' }, // 注意・進行中
-    { value: '修理中', badge: 'badge-orange', nodeColor: '#a86a09' }, // 注意・対応中
-    { value: '停止中', badge: 'badge-red',    nodeColor: '#b03024' }, // 停止・要対応
-    { value: '廃棄',   badge: 'badge-gray',   nodeColor: '#6c7787' }  // 対象外
+    { value: '稼働中', badge: 'badge-green',  nodeColor: '#1c7a4c', level: 'ok'   }, // 正常
+    { value: '点検中', badge: 'badge-orange', nodeColor: '#c98a12', level: 'warn' }, // 注意・進行中
+    { value: '修理中', badge: 'badge-orange', nodeColor: '#a86a09', level: 'warn' }, // 注意・対応中
+    { value: '停止中', badge: 'badge-red',    nodeColor: '#b03024', level: 'stop' }, // 停止・要対応
+    { value: '廃棄',   badge: 'badge-gray',   nodeColor: '#6c7787', level: 'off'  }  // 対象外
 ];
 
 // マスタ定義 (初期データ)
@@ -293,8 +296,9 @@ let uiPrefs = {
 };
 
 // リスト表示設定
-// 既定の列: 名称（状態ドット付き）→ 次回予定 → マスタごとのタグ → ステータス
-// 「次に何をすべきか」が分かる次回予定を名称のすぐ隣に置く。導入日は列設定から出せる。
+// 既定の列: 名称（状態ドット＋異常時のバッジ）→ 次回予定 → マスタごとのタグ
+// 「次に何をすべきか」が分かる次回予定を名称のすぐ隣に置く。
+// 状態は名称の側で示すため、ステータス列・導入日は列設定から出せるようにしておく。
 function getDefaultListColumns() {
     const tagColumns = masters.map((m, idx) => ({
         key: `tags-${m.id}`, label: m.name, visible: true, order: 2 + idx, align: 'left', width: 'auto'
@@ -303,14 +307,14 @@ function getDefaultListColumns() {
         { key: 'name', label: '資産名称', visible: true, order: 0, align: 'left', width: 'auto' },
         { key: 'scheduledPlans.next', label: '次回予定', visible: true, order: 1, align: 'left', width: 'auto' },
         ...tagColumns,
-        { key: 'status', label: 'ステータス', visible: true, order: 2 + tagColumns.length, align: 'left', width: 'auto' },
+        { key: 'status', label: 'ステータス', visible: false, order: 2 + tagColumns.length, align: 'left', width: 'auto' },
         { key: 'date', label: '導入日', visible: false, order: 3 + tagColumns.length, align: 'left', width: 'auto' },
         { key: 'id', label: '資産ID', visible: false, order: 4 + tagColumns.length, align: 'left', width: 'auto' }
     ];
 }
 
 // 列の既定構成の版。上げると、保存済みの列設定に新しい既定列を1度だけ追加する。
-const LIST_LAYOUT_VERSION = 3;
+const LIST_LAYOUT_VERSION = 4;
 
 let listDisplaySettings = {
     columns: getDefaultListColumns()
@@ -319,10 +323,13 @@ let listDisplaySettings = {
 /**
  * 保存済みの列設定を新しい既定に合わせる（ユーザーの並べ替え・表示切替は尊重する）
  * v3: 「次回予定」列を名称の次に追加
+ * v4: 状態は名称の側（ドット＋異常時のバッジ）で示すため、ステータス列を既定で外す
  */
 function migrateListDisplaySettings() {
-    if((uiPrefs.listLayoutVersion || 0) >= LIST_LAYOUT_VERSION) return;
+    const from = uiPrefs.listLayoutVersion || 0;
+    if(from >= LIST_LAYOUT_VERSION) return;
     const cols = listDisplaySettings.columns || [];
+    if(from < 4) cols.forEach(c => { if(c.key === 'status') c.visible = false; });
     if(!cols.some(c => c.key === 'scheduledPlans.next')) {
         const nameCol = cols.find(c => c.key === 'name');
         const at = nameCol ? nameCol.order + 1 : 0;
