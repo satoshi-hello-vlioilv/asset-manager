@@ -12,6 +12,19 @@
     .hide-lg { display: none !important; }
 }
 
+/* タブレット幅：ヘッダーを2段にして、ボタンのラベルを省かずに済む幅を確保する
+   1段目 = ページ切替と主要操作 / 2段目 = 検索・表示切替・列 */
+@media (min-width: 641px) and (max-width: 1180px) {
+    .header {
+        height: auto; min-height: var(--header-height);
+        flex-wrap: wrap; row-gap: 6px; padding-top: 6px; padding-bottom: 6px;
+    }
+    .header-left { height: 40px; }
+    .header-tools { order: 3; flex: 1 1 100%; margin-left: 0; }
+    .search-container { flex: 1 1 auto; max-width: none; }
+    .header-right { margin-left: auto; }
+}
+
 @media (max-width: 900px) {
     .header { padding: 0 var(--space-3); gap: var(--space-2); }
 
@@ -55,12 +68,35 @@
         padding: var(--space-2) var(--space-3);
         flex-wrap: wrap; row-gap: var(--space-2);
     }
-    /* 1段目: ページ切替 + 主要動線 / 2段目: 検索と表示切替 */
-    .header-left  { flex: 1 1 auto; min-width: 0; height: 40px; gap: var(--space-2); }
-    .top-nav-item { padding: 0 8px; }
-    .top-nav-item .count-pill { display: none; }
-    .header-right { flex: 0 0 auto; margin-left: auto; }
-    .header-tools { order: 3; flex: 1 1 100%; margin-left: 0; }
+    /* ページ切替・新規・メニューは下部タブバーへ移したので、ヘッダーは検索と表示切替の1段だけ */
+    .header-left { display: none; }
+    .header-right { flex: 0 0 0; margin: 0; }
+    .header-right > .btn, .header-right > .autosave-indicator,
+    .header-right .menu-wrap > .btn { display: none !important; }
+    .header-tools { flex: 1 1 100%; margin-left: 0; }
+    #viewToggle .btn { padding: 0 6px; gap: 3px; font-size: var(--text-xs); }
+
+    /* 下部タブバー（親指の届く位置に、ラベル付きで） */
+    .tab-bar {
+        display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-overlay);
+        height: calc(56px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
+        background: var(--surface); border-top: 1px solid var(--border);
+    }
+    .content-scroll { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+    .toast { bottom: calc(68px + env(safe-area-inset-bottom)); }
+
+    /* 「メニュー」は下から出るシートにする */
+    #moreMenu {
+        position: fixed; left: 0; right: 0; top: auto; bottom: calc(56px + env(safe-area-inset-bottom));
+        min-width: 0; max-height: 70vh; border-radius: 14px 14px 0 0;
+        box-shadow: var(--shadow-xl); animation: sheetIn var(--dur) var(--ease);
+    }
+    #moreMenu .menu-item { padding-top: 8px; padding-bottom: 8px; }
+    /* シートの外側は暗くし、外側のタップは「閉じる」だけにする（下の行を誤って開かない） */
+    body:has(#moreMenu.open)::before {
+        content: ''; position: fixed; inset: 0; z-index: calc(var(--z-sticky) - 1);
+        background: rgba(23, 28, 36, 0.35);
+    }
     .search-container { flex: 1 1 120px; max-width: none; }
     .search-suggest { position: fixed; left: 8px; right: 8px; top: auto; width: auto; margin-top: 4px; }
     .search-suggest .palette-footer > span:not(:first-child) { display: none; }

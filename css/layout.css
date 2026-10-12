@@ -249,3 +249,20 @@
 
 .content-scroll { flex: 1; overflow-y: auto; padding: var(--d-content); }
 .content-inner { max-width: 1680px; margin: 0 auto; }
+
+/* ============================================================
+   モバイルの下部タブバー（表示は responsive.css で 640px 以下のみ）
+   ============================================================ */
+.tab-bar { display: none; }
+.tab-bar-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    border: none; background: transparent; font-family: inherit; cursor: pointer;
+    font-size: var(--text-2xs); font-weight: 600; color: var(--text-sub);
+}
+.tab-bar-item i { font-size: 1rem; color: var(--text-faint); }
+.tab-bar-item.active, .tab-bar-item.is-open { color: var(--primary); }
+.tab-bar-item.active i, .tab-bar-item.is-open i { color: var(--primary); }
+.tab-bar-new i {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--primary); color: #fff !important;
+    display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+}

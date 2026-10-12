@@ -68,6 +68,9 @@ function renderTopNav() {
     const list = document.getElementById('navAssets');
     if(dash) dash.classList.toggle('active', currentPage === 'dashboard');
     if(list) list.classList.toggle('active', currentPage === 'assets');
+    // モバイルの下部タブバーも同じ状態にそろえる
+    document.getElementById('tabBarDashboard')?.classList.toggle('active', currentPage === 'dashboard');
+    document.getElementById('tabBarAssets')?.classList.toggle('active', currentPage === 'assets');
     const count = document.getElementById('navAssetCount');
     if(count) count.textContent = getPersistedAssets().length;
 }

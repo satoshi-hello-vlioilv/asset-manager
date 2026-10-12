@@ -96,6 +96,7 @@ function toggleMenu(id, event) {
     closeMenus();
     closeFilterPopover();
     if(!wasOpen) {
+        if(id === 'moreMenu') document.getElementById('tabBarMenu')?.classList.add('is-open');
         menu.classList.add('open');
         if(id === 'moreMenu') refreshStorageUsage();
     }
@@ -121,6 +122,7 @@ async function refreshStorageUsage() {
 
 function closeMenus() {
     document.querySelectorAll('.menu.open').forEach(m => m.classList.remove('open'));
+    document.getElementById('tabBarMenu')?.classList.remove('is-open');
 }
 
 /**

@@ -69,19 +69,19 @@
                 <!-- 表示切替（資産一覧でのみ表示） -->
                 <div class="segmented" id="viewToggle" style="display:none;" role="group" aria-label="表示形式">
                     <button class="btn btn-sm" id="btnViewList" onclick="switchAssetView('list')" title="リスト表示：項目を比較したいとき (1)">
-                        <i class="fa-solid fa-list"></i><span class="hide-lg">リスト</span>
+                        <i class="fa-solid fa-list"></i><span>リスト</span>
                     </button>
                     <button class="btn btn-sm btn-ghost" id="btnViewCard" onclick="switchAssetView('card')" title="カード表示：見た目で探したいとき (2)">
-                        <i class="fa-solid fa-grip"></i><span class="hide-lg">カード</span>
+                        <i class="fa-solid fa-grip"></i><span>カード</span>
                     </button>
                     <button class="btn btn-sm btn-ghost" id="btnViewCalendar" onclick="switchAssetView('calendar')" title="カレンダー表示：予定を確認したいとき (3)">
-                        <i class="fa-solid fa-calendar"></i><span class="hide-lg">カレンダー</span>
+                        <i class="fa-solid fa-calendar"></i><span class="hide-sm">カレンダー</span><span class="show-sm">予定</span>
                     </button>
                 </div>
 
                 <!-- リスト表示設定（リスト表示のときだけ現れる） -->
                 <button class="btn btn-outline btn-sm" onclick="openListSettingsModal()" id="btnListSettings" style="display:none;" title="表示する列と並び順を変更">
-                    <i class="fa-solid fa-table-columns"></i><span class="hide-md">列</span>
+                    <i class="fa-solid fa-table-columns"></i><span>列</span>
                 </button>
             </div>
 
@@ -90,14 +90,14 @@
                 <span class="autosave-indicator hide-md" id="autoSaveIndicator" title="データはこのブラウザのIndexedDBに自動保存されます"></span>
 
                 <button class="btn btn-ghost btn-sm hide-sm" onclick="openMasterModal()" title="タグ階層とカスタムフィールドを編集します">
-                    <i class="fa-solid fa-sitemap"></i><span class="hide-md">マスタ・タグ設定</span>
+                    <i class="fa-solid fa-sitemap"></i><span>マスタ・タグ設定</span>
                 </button>
 
                 <!-- その他の操作（ラベル付きメニューに集約） -->
                 <div class="menu-wrap">
-                    <button class="btn btn-ghost btn-icon-only" onclick="toggleMenu('moreMenu', event)"
-                            title="その他の操作" aria-label="その他の操作" aria-haspopup="true">
-                        <i class="fa-solid fa-ellipsis-vertical"></i>
+                    <button class="btn btn-ghost btn-sm" onclick="toggleMenu('moreMenu', event)"
+                            title="バックアップ・表示・設定などの操作" aria-haspopup="true">
+                        <i class="fa-solid fa-ellipsis-vertical"></i><span>その他</span>
                     </button>
                     <div class="menu" id="moreMenu">
                         <div class="menu-label">データ</div>
@@ -185,6 +185,26 @@
         </div>
     </main>
 </div>
+
+<!-- =============================================
+     モバイルの下部タブバー（640px以下）
+     ページ切替・新規・メニューを親指の届く位置に、ラベル付きで置く。
+     ヘッダーは検索と表示切替の1段だけになり、一覧の表示領域が増える。
+     ============================================= -->
+<nav class="tab-bar" id="tabBar" aria-label="メインナビゲーション（モバイル）">
+    <button class="tab-bar-item" id="tabBarDashboard" onclick="showDashboard()">
+        <i class="fa-solid fa-gauge-high"></i><span>ホーム</span>
+    </button>
+    <button class="tab-bar-item" id="tabBarAssets" onclick="showAssets()">
+        <i class="fa-solid fa-layer-group"></i><span>資産一覧</span>
+    </button>
+    <button class="tab-bar-item tab-bar-new" onclick="createNewAsset()">
+        <i class="fa-solid fa-plus"></i><span>新規</span>
+    </button>
+    <button class="tab-bar-item" id="tabBarMenu" onclick="toggleMenu('moreMenu', event)" aria-haspopup="true">
+        <i class="fa-solid fa-bars"></i><span>メニュー</span>
+    </button>
+</nav>
 
 <!-- マスタ別の絞り込み（タグ階層ツリー） -->
 <div class="filter-popover" id="filterPopover" role="dialog" aria-label="タグで絞り込む"></div>
